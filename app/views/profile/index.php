@@ -1,18 +1,24 @@
 <?php use App\Core\View; use App\Helpers\Security; ?>
-<div class="card">
+<div class="card profile-card">
   <div class="card-header d-flex justify-content-between align-items-center">
     <h3 class="card-title mb-0"><i class="fas fa-user mr-2 text-primary" aria-hidden="true"></i> Mi perfil</h3>
     <button type="button" id="btnEditProfile" class="btn btn-outline-primary btn-sm"><i class="fas fa-edit mr-1" aria-hidden="true"></i> Editar</button>
   </div>
   <div class="card-body">
     <div class="row">
-      <div class="col-md-4">
+      <div class="col-md-4 d-flex flex-column align-items-center text-center">
         <?php $__av = $user['avatar'] ?? 'https://via.placeholder.com/300x300?text=Avatar'; if (strpos($__av, 'http://') !== 0 && strpos($__av, 'https://') !== 0) { $__av = BASE_URL . '/' . ltrim($__av, '/'); } ?>
-        <img class="img-fluid img-thumbnail" src="<?= View::e($__av) ?>" alt="Avatar" style="object-fit:cover; width:100%; max-width:300px; height:auto;">
-        <form class="mt-3" method="post" action="<?= BASE_URL ?>/profile/avatar" enctype="multipart/form-data" data-loading-text="Subiendo avatar...">
+        <div class="profile-avatar mb-3">
+          <img class="profile-avatar-img" src="<?= View::e($__av) ?>" alt="Avatar">
+        </div>
+        <form class="mt-2 w-100 profile-avatar-form" method="post" action="<?= BASE_URL ?>/profile/avatar" enctype="multipart/form-data" data-loading-text="Subiendo avatar...">
           <input type="hidden" name="csrf" value="<?= Security::csrfToken() ?>">
-          <div class="form-group"><input type="file" name="avatar" accept="image/*" required></div>
-          <button class="btn btn-secondary" data-loading-text="Subiendo avatar..."><i class="fas fa-upload mr-1" aria-hidden="true"></i> Actualizar avatar</button>
+          <div class="custom-file mb-2">
+            <input type="file" class="custom-file-input" id="avatarInput" name="avatar" accept="image/*" required>
+            <label class="custom-file-label text-left" for="avatarInput">Elegir imagen...</label>
+          </div>
+          <button class="btn btn-secondary btn-block" data-loading-text="Subiendo avatar..."><i class="fas fa-upload mr-1" aria-hidden="true"></i> Actualizar avatar</button>
+          <div class="text-muted small mt-2">Formatos: JPG, PNG, GIF, WEBP</div>
         </form>
       </div>
       <div class="col-md-8">
@@ -126,5 +132,27 @@
     setMode(false); // start in view mode
     var btn = document.getElementById('btnEditProfile');
     if (btn) btn.addEventListener('click', function(){ setMode(true); });
+
+    // Show chosen file name for custom-file input (Bootstrap 4 behavior)
+    var fileInput = document.getElementById('avatarInput');
+    if (fileInput) {
+      fileInput.addEventListener('change', function(){
+        var lbl = document.querySelector('label[for="avatarInput"]');
+        if (lbl && fileInput.files && fileInput.files.length) {
+          lbl.textContent = fileInput.files[0].name;
+        }
+      });
+    }
   })();
 </script>
+
+<style>
+  /* Scoped styles for profile */
+  .profile-card { overflow: hidden; }
+  .profile-avatar { width: 180px; height: 180px; border-radius: 50%; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,.12); border: 3px solid #fff; background: #f8f9fa; }
+  .profile-avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .profile-avatar-form .custom-file-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  @media (max-width: 576px) {
+    .profile-avatar { width: 140px; height: 140px; }
+  }
+</style>

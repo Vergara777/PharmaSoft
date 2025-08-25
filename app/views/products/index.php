@@ -133,6 +133,25 @@
                       data-image="<?= View::e($p['image'] ?? '') ?>">
                 <i class="fas fa-eye mr-1" aria-hidden="true"></i> Ver
               </button>
+              <?php
+                $isActiveSt = (strtolower($p['status'] ?? '') === 'active' || strtolower($p['status'] ?? '') === 'activo');
+                $canAddCart = $isActiveSt && $stock > 0 && !($days !== null && $days < 0);
+              ?>
+              <button type="button"
+                      class="btn btn-sm btn-success btnAddToCartProduct"
+                      data-id="<?= (int)$p['id'] ?>"
+                      data-sku="<?= View::e($p['sku'] ?? '') ?>"
+                      data-name="<?= View::e($p['name'] ?? '') ?>"
+                      data-description="<?= View::e($p['description'] ?? '') ?>"
+                      data-stock="<?= View::e($p['stock'] ?? 0) ?>"
+                      data-price="<?= (int)($p['price'] ?? 0) ?>"
+                      data-expires_at="<?= View::e($p['expires_at'] ?? '') ?>"
+                      data-status="<?= View::e($p['status'] ?? '') ?>"
+                      data-image="<?= View::e($p['image'] ?? '') ?>"
+                      <?= $canAddCart ? '' : 'disabled' ?>
+              >
+                <i class="fas fa-cart-plus mr-1" aria-hidden="true"></i> Agregar al carrito
+              </button>
               <?php if ($isAdmin): ?>
               <?php if ($isRetired): ?>
                 <form method="post" action="<?= BASE_URL ?>/products/reactivate/<?= View::e($p['id']) ?>" style="display:inline">
@@ -141,10 +160,24 @@
                 </form>
               <?php else: ?>
                 <a class="btn btn-sm btn-warning" href="<?= BASE_URL ?>/products/edit/<?= View::e($p['id']) ?>"><i class="fas fa-edit mr-1" aria-hidden="true"></i> Editar</a>
-                <form method="post" action="<?= BASE_URL ?>/products/delete/<?= View::e($p['id']) ?>" style="display:inline">
+                <?php
+                  $pid = (int)($p['id'] ?? 0);
+                  $hasRef = !empty($hasSales) && isset($hasSales[$pid]);
+                ?>
+                <?php if ($isActiveSt): ?>
+                <form method="post" action="<?= BASE_URL ?>/products/retire/<?= View::e($pid) ?>" style="display:inline">
+                  <input type="hidden" name="csrf" value="<?= Security::csrfToken() ?>">
+                  <button type="submit" class="btn btn-sm <?= $hasRef ? 'btn-danger' : 'btn-outline-secondary' ?>">
+                    <i class="fas fa-ban mr-1" aria-hidden="true"></i> Desactivar
+                  </button>
+                </form>
+                <?php endif; ?>
+                <?php if (!$hasRef): ?>
+                <form method="post" action="<?= BASE_URL ?>/products/delete/<?= View::e($pid) ?>" style="display:inline">
                   <input type="hidden" name="csrf" value="<?= Security::csrfToken() ?>">
                   <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash-alt mr-1" aria-hidden="true"></i> Eliminar</button>
                 </form>
+                <?php endif; ?>
               <?php endif; ?>
               <?php endif; ?>
             </td>
@@ -153,6 +186,38 @@
       </tbody>
     </table>
   </div>
+</div>
+
+<!-- Floating Cart Button and Modal (Products) -->
+<button id="btnCartFloating" class="cart-fab" title="Ver carrito" aria-label="Ver carrito">
+  <i class="fas fa-shopping-cart" aria-hidden="true"></i>
+  <span class="badge badge-danger cart-fab-badge" id="cartFabCount" style="display:none;">0</span>
+  <span class="sr-only">Carrito</span>
+</button>
+
+<div id="cartModal" class="ps-modal" style="display:none;">
+  <div class="ps-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="cartModalTitle">
+    <div class="ps-modal-header">
+      <h5 id="cartModalTitle" class="mb-0 d-flex align-items-center">
+        <i class="fas fa-shopping-cart mr-2 text-primary" aria-hidden="true"></i>
+        Carrito
+        <span class="badge badge-secondary ml-2" id="cartModalCount">0</span>
+      </h5>
+      <button type="button" class="close" id="cartModalClose" aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
+    </div>
+    <div class="ps-modal-body" id="cartModalBody">
+      <div class="text-muted p-3">No hay borrador de carrito en este navegador.</div>
+    </div>
+    <div class="ps-modal-footer d-flex justify-content-between align-items-center" id="cartModalFooter" style="display:none;">
+      <div class="text-muted small">Borrador guardado localmente.</div>
+      <div class="d-flex align-items-center" style="gap:.5rem;">
+        <div class="mr-3"><strong>Total:</strong> <span id="cartModalTotal">$0</span></div>
+        <a href="<?= BASE_URL ?>/sales/create" class="btn btn-outline-primary btn-sm"><i class="fas fa-cash-register mr-1"></i> Ir a realizar compra</a>
+        <button type="button" class="btn btn-outline-danger btn-sm" id="cartModalClear"><i class="fas fa-trash mr-1"></i> Vaciar</button>
+      </div>
+    </div>
+  </div>
+  <div class="ps-modal-backdrop" id="cartModalBackdrop"></div>
 </div>
 
 <?php if (!empty($pagination) && is_array($pagination)): ?>
@@ -177,8 +242,37 @@
   </div>
 <?php endif; ?>
 
+<style>
+  /* Floating cart button */
+  .cart-fab { position: fixed; right: 20px; bottom: 20px; z-index: 1040; border: none; border-radius: 50%; width: 56px; height: 56px; background: #3c8dbc; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.25); display: inline-flex; align-items: center; justify-content: center; }
+  .cart-fab:hover { background: #357ea8; }
+  .cart-fab .fa-shopping-cart { font-size: 1.25rem; }
+  .cart-fab-badge { position: absolute; top: -6px; right: -6px; border-radius: 10px; font-weight: 700; }
+  /* Lightweight modal */
+  .ps-modal { position: fixed; inset: 0; z-index: 1050; display: none; }
+  .ps-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.45); }
+  .ps-modal-dialog { position: relative; background: #fff; z-index: 1; max-width: 860px; width: 92%; margin: 40px auto; border-radius: 8px; box-shadow: 0 16px 40px rgba(0,0,0,.3); display: flex; flex-direction: column; max-height: calc(100vh - 80px); }
+  .ps-modal-header { padding: 12px 16px; border-bottom: 1px solid #eee; display: flex; align-items: center; position: relative; }
+  .ps-modal-body { padding: 0; max-height: calc(100vh - 190px); overflow: auto; }
+  .ps-modal-footer { padding: 10px 16px; border-top: 1px solid #eee; background: #fafafa; }
+  .ps-modal .close { background: transparent; border: 0; font-size: 1.6rem; line-height: 1; color: #333; position: absolute; right: 10px; top: 8px; padding: 4px 8px; opacity: .8; }
+  .ps-modal .close:hover { opacity: 1; }
+  @media (max-width: 576px) {
+    .ps-modal-dialog { width: 96%; margin: 10px auto; max-height: calc(100vh - 20px); }
+    .ps-modal-body { max-height: calc(100vh - 170px); }
+  }
+</style>
+
 <script>
   document.addEventListener('DOMContentLoaded', function(){
+    // If global cart is present in layout, hide/remove local cart UI to avoid duplicates
+    try {
+      var gFab = document.getElementById('globalCartFab');
+      if (gFab) {
+        var lf = document.getElementById('btnCartFloating'); if (lf) lf.style.display = 'none';
+        var lm = document.getElementById('cartModal'); if (lm && lm.parentNode) lm.parentNode.removeChild(lm);
+      }
+    } catch(_){}
     // Modal de detalles
     function createDetailModal(){
       if (document.getElementById('productDetailModal')) return;
@@ -311,6 +405,61 @@
       if (window.jQuery && jQuery.fn && jQuery.fn.modal) { jQuery(m).modal('show'); }
       else { showModalFallback(m); }
     }
+    // Helper: nicer prompt to go to cart
+    function goToCartPrompt(){
+      if (window.Swal && Swal.fire) {
+        return Swal.fire({
+          title: 'Producto agregado',
+          text: '¿Deseas ir al carrito de ventas ahora?',
+          icon: 'success',
+          showCancelButton: true,
+          confirmButtonText: 'Ir al carrito',
+          cancelButtonText: 'Seguir viendo productos',
+          reverseButtons: true,
+          focusCancel: true,
+          heightAuto: false,
+          toast: false,
+          backdrop: true,
+          allowOutsideClick: false,
+          allowEscapeKey: false
+        }).then(function(res){ if (res.isConfirmed) { window.location.href = '<?= BASE_URL ?>/sales/create'; } });
+      }
+      // Fallback: centered modal with backdrop
+      try {
+        var id = 'ps-go-cart-overlay';
+        var old = document.getElementById(id);
+        if (old && old.parentNode) old.parentNode.removeChild(old);
+        var ov = document.createElement('div');
+        ov.id = id;
+        ov.style.position = 'fixed';
+        ov.style.inset = '0';
+        ov.style.background = 'rgba(0,0,0,.35)';
+        ov.style.zIndex = '1060';
+        ov.style.display = 'flex';
+        ov.style.alignItems = 'center';
+        ov.style.justifyContent = 'center';
+        var card = document.createElement('div');
+        card.style.background = '#fff';
+        card.style.border = '1px solid #e5e5e5';
+        card.style.borderRadius = '12px';
+        card.style.boxShadow = '0 10px 30px rgba(0,0,0,.18)';
+        card.style.padding = '18px 20px';
+        card.style.maxWidth = '420px';
+        card.style.width = '92%';
+        card.innerHTML = '<div style="font-weight:600; font-size:1.05rem; margin-bottom:8px;">Producto agregado</div>\
+                         <div style="font-size:.95rem; color:#555; margin-bottom:14px;">¿Deseas ir al carrito de ventas ahora?</div>\
+                         <div style="display:flex; gap:10px; justify-content:flex-end;">\
+                           <button id="ps-continue" class="btn btn-sm btn-light">Seguir viendo productos</button>\
+                           <button id="ps-go" class="btn btn-sm btn-primary">Ir al carrito</button>\
+                         </div>';
+        ov.appendChild(card);
+        document.body.appendChild(ov);
+        var close = function(){ if (ov && ov.parentNode) ov.parentNode.removeChild(ov); };
+        // Disable closing by clicking on the backdrop; only buttons close
+        card.querySelector('#ps-continue').onclick = close;
+        card.querySelector('#ps-go').onclick = function(){ window.location.href = '<?= BASE_URL ?>/sales/create'; };
+      } catch(_){ window.location.href = '<?= BASE_URL ?>/sales/create'; }
+    }
     // Delegación para asegurar que siempre capture clics
     document.addEventListener('click', function(ev){
       var t = ev.target;
@@ -319,6 +468,73 @@
         ev.preventDefault();
         try { console.debug('[Productos] abrir detalles', {id: t.getAttribute('data-id')}); } catch(_){ }
         openDetails(t);
+        return;
+      }
+      if (t.classList && t.classList.contains('btnAddToCartProduct')) {
+        ev.preventDefault();
+        // normalize when icon is clicked
+        var btn = t;
+        if (!btn.getAttribute('data-id') && btn.closest('.btnAddToCartProduct')) { btn = btn.closest('.btnAddToCartProduct'); }
+        var pid = parseInt(btn.getAttribute('data-id') || '0', 10) || 0;
+        var name = btn.getAttribute('data-name') || '';
+        var sku = btn.getAttribute('data-sku') || '';
+        var desc = btn.getAttribute('data-description') || '';
+        var price = Math.max(0, Math.round(parseFloat(btn.getAttribute('data-price') || '0')||0));
+        var stock = parseInt(btn.getAttribute('data-stock') || '0', 10) || 0;
+        var img = btn.getAttribute('data-image') || '';
+        var status = (btn.getAttribute('data-status') || '').toLowerCase();
+        if (!pid) return;
+        if (status !== 'active' && status !== 'activo') {
+          return centerNotify({ icon:'info', title:'No disponible', text:'El producto no está activo.' , position:'bottom-end', toast:true });
+        }
+        if (stock <= 0) {
+          return centerNotify({ icon:'warning', title:'Sin stock', text:'No hay stock disponible.' , position:'bottom-end', toast:true });
+        }
+        var item = { product_id: pid, sku: sku, name: name, description: desc, unit_price: price, stock: stock, image: img, status: status, qty: 1 };
+        var proceed = function(){
+          try { if (window.loadingBar) window.loadingBar.start('Agregando...'); } catch(_){ }
+          try {
+            var KEY = 'pharmasoft_sales_draft';
+            var LEGACY = 'pharmasoft_pending_cart';
+            // migrate legacy if present
+            (function migrate(){ try { var old = localStorage.getItem(LEGACY); if (old && !localStorage.getItem(KEY)) { localStorage.setItem(KEY, old); localStorage.removeItem(LEGACY); } } catch(_){} })();
+            var arr = [];
+            try { arr = JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch(e){ arr = []; }
+            var found = false;
+            for (var i=0;i<arr.length;i++) {
+              if ((arr[i]||{}).product_id === pid) {
+                var next = Math.min(stock, (parseInt(arr[i].qty||'1',10)||1)+1);
+                arr[i].qty = next;
+                arr[i].unit_price = price; arr[i].name = name; arr[i].sku = sku; arr[i].image = img; arr[i].status = status; arr[i].description = desc; arr[i].stock = stock;
+                found = true; break;
+              }
+            }
+            if (!found) arr.push(item);
+            localStorage.setItem(KEY, JSON.stringify(arr));
+            // live refresh FAB/modal if present
+            try { if (window.psCart && typeof window.psCart.refresh === 'function') window.psCart.refresh(); } catch(_){ }
+            centerNotify({ icon:'success', title:'Agregado', text:'"' + name + '" se agregó al carrito.', position:'bottom-end', toast:true });
+            goToCartPrompt();
+          } catch(e) {
+            console.error('add to cart failed', e);
+          } finally {
+            try { if (window.loadingBar) window.loadingBar.stop(); } catch(_){ }
+          }
+        };
+        // Confirmar costo antes de agregar
+        if (window.Swal && Swal.fire) {
+          Swal.fire({
+            title: 'Confirmar agregado',
+            html: 'Producto: <strong>' + (name || sku) + '</strong><br>Precio: <strong>' + fmtCurrency(price) + '</strong><br><small>Se agregará 1 unidad.</small>',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Agregar',
+            cancelButtonText: 'Cancelar',
+            reverseButtons: true
+          }).then(function(r){ if (r && r.isConfirmed) proceed(); });
+        } else {
+          if (confirm('Agregar "' + (name||sku) + '" por ' + fmtCurrency(price) + ' al carrito?')) proceed();
+        }
       }
     });
     function centerNotify(opts){
@@ -408,5 +624,95 @@
       // Mantener selección tras navegación (opcional simple)
       applyFilter();
     } catch(e){}
+
+    // ----- Cart modal (Products) -----
+    (function cartModalProducts(){
+      // If global cart exists, do not init local cart modal
+      if (document.getElementById('globalCartFab')) return;
+      var KEY = 'pharmasoft_sales_draft';
+      var LEGACY = 'pharmasoft_pending_cart';
+      var fab = document.getElementById('btnCartFloating');
+      var fabCount = document.getElementById('cartFabCount');
+      var modal = document.getElementById('cartModal');
+      var mBody = document.getElementById('cartModalBody');
+      var mFooter = document.getElementById('cartModalFooter');
+      var mCount = document.getElementById('cartModalCount');
+      var mTotal = document.getElementById('cartModalTotal');
+      var mClose = document.getElementById('cartModalClose');
+      var mBackdrop = document.getElementById('cartModalBackdrop');
+      var mClear = document.getElementById('cartModalClear');
+
+      function fmt(n){ try { return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0}).format(n||0); } catch(e){ var v=Math.round(n||0); return '$'+String(v).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); } }
+      function migrate(){ try { var old = localStorage.getItem(LEGACY); if (old && !localStorage.getItem(KEY)) { localStorage.setItem(KEY, old); localStorage.removeItem(LEGACY); } } catch(_){} }
+      function read(){ migrate(); try { var raw = localStorage.getItem(KEY); var arr = raw ? JSON.parse(raw||'[]')||[] : []; return Array.isArray(arr)?arr:[]; } catch(_){ return []; } }
+      function write(arr){ try { if (arr && arr.length) localStorage.setItem(KEY, JSON.stringify(arr)); else localStorage.removeItem(KEY); } catch(_){} }
+      function total(arr){ var t=0; (arr||[]).forEach(function(it){ var q=parseInt(it.qty||0,10)||0; var p=Math.round(parseFloat(it.unit_price||0)||0); t+=q*p; }); return t; }
+      function render(){
+        var items = read();
+        var cnt = items.length;
+        if (fabCount){ fabCount.style.display = cnt>0?'inline-block':'none'; fabCount.textContent = String(cnt); }
+        if (mCount){ mCount.textContent = String(cnt); }
+        if (!cnt){
+          if (mBody) mBody.innerHTML = '<div class="p-3 text-muted">No hay borrador de carrito.</div>';
+          if (mFooter) mFooter.style.display = 'none';
+          if (mTotal) mTotal.textContent = fmt(0);
+          return;
+        }
+        var html = '\n<div class="table-responsive">\n<table class="table table-sm table-hover mb-0">\n<thead><tr><th>#</th><th>SKU</th><th>Producto</th><th class="text-right">Cant.</th><th class="text-right">P. Unit</th><th class="text-right">Importe</th><th></th></tr></thead><tbody>';
+        for (var i=0;i<items.length;i++){
+          var it = items[i]||{}; var idx=i+1;
+          var img = it.image ? '<?= BASE_URL ?>/uploads/'+it.image : '';
+          var name = (it.name||'').replace(/</g,'&lt;');
+          var sku = (it.sku||'').replace(/</g,'&lt;');
+          var q = Math.max(1, parseInt(it.qty||1,10)||1);
+          var p = Math.max(0, Math.round(parseFloat(it.unit_price||0)||0));
+          var imp = q*p;
+          html += '<tr data-i="'+i+'">'
+            + '<td>'+idx+'</td>'
+            + '<td>'+sku+'</td>'
+            + '<td>' + (img?('<img src="'+img+'" alt="" style="width:42px;height:42px;object-fit:cover;border-radius:4px;border:1px solid #eee;margin-right:8px;vertical-align:middle;">'):'') + name + '</td>'
+            + '<td class="text-right">'+q+'</td>'
+            + '<td class="text-right">'+fmt(p)+'</td>'
+            + '<td class="text-right">'+fmt(imp)+'</td>'
+            + '<td class="text-right"><button type="button" class="btn btn-sm btn-outline-danger btnRemoveItem" title="Quitar"><i class="fas fa-trash"></i></button></td>'
+            + '</tr>';
+        }
+        html += '</tbody></table></div>';
+        if (mBody) mBody.innerHTML = html;
+        if (mFooter) mFooter.style.display = '';
+        if (mTotal) mTotal.textContent = fmt(total(items));
+        var btns = mBody ? mBody.querySelectorAll('.btnRemoveItem') : [];
+        if (btns && btns.forEach){ btns.forEach(function(b){ b.addEventListener('click', function(){ var tr=b.closest('tr'); var idx = tr ? parseInt(tr.getAttribute('data-i')||'-1',10) : -1; var arr = read(); if (idx>=0 && idx < arr.length){ arr.splice(idx,1); write(arr); render(); } }); }); }
+      }
+      function open(){ if (!modal) return; render(); modal.style.display='block'; document.body.style.overflow='hidden'; }
+      function close(){ if (!modal) return; modal.style.display='none'; document.body.style.overflow=''; }
+      if (fab) fab.addEventListener('click', function(e){ e.preventDefault(); open(); });
+      if (mClose) mClose.addEventListener('click', function(){ close(); });
+      if (mBackdrop) mBackdrop.addEventListener('click', function(e){ if (e.target===mBackdrop) close(); });
+      if (mClear) mClear.addEventListener('click', function(){
+        try {
+          if (window.Swal && Swal.fire) {
+            return Swal.fire({
+              title: 'Vaciar carrito',
+              text: '¿Desea vaciar el borrador del carrito?',
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonText: 'Sí, vaciar',
+              cancelButtonText: 'No'
+            }).then(function(res){ if (res && res.isConfirmed) { write([]); render(); } });
+          }
+          if (window.psConfirm) {
+            return window.psConfirm({ title:'Vaciar carrito', text:'¿Desea vaciar el borrador del carrito?', ok:'Sí', cancel:'No' })
+              .then(function(ok){ if (ok) { write([]); render(); } });
+          }
+        } catch(_){ }
+        if (confirm('¿Desea vaciar el borrador del carrito?')) { write([]); render(); }
+      });
+      // expose for live refresh
+      window.psCart = window.psCart || {};
+      window.psCart.refresh = render;
+      // initial badge update
+      render();
+    })();
   });
 </script>

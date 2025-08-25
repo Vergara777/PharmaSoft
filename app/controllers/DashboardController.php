@@ -21,6 +21,11 @@ class DashboardController extends Controller {
                                    ->fetchColumn();
         $todaySalesTotal = (float)$db->query("SELECT COALESCE(SUM(total),0) s FROM sales WHERE DATE(created_at) = CURDATE()")
                                      ->fetchColumn();
+        // Month and Year totals (ganancias = total de ventas)
+        $monthSalesTotal = (float)$db->query("SELECT COALESCE(SUM(total),0) s FROM sales WHERE YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())")
+                                     ->fetchColumn();
+        $yearSalesTotal = (float)$db->query("SELECT COALESCE(SUM(total),0) s FROM sales WHERE YEAR(created_at)=YEAR(CURDATE())")
+                                    ->fetchColumn();
         // Support legacy single-item and new multi-item sales
         $todaySales = $db->query(
             "SELECT 
@@ -101,6 +106,6 @@ class DashboardController extends Controller {
             $msg2 = 'Tienes ' . $expiringSoon . ' producto(s) por vencer (≤ 30 días).' . (empty($items2) ? '' : (' Ej: ' . implode(', ', $items2))) . $extra2;
             Flash::info($msg2, 'Por vencer');
         }
-        $this->view('dashboard/index', compact('totalProducts','lowStock','expiring','expired','expiringSoon','todaySalesCount','todaySalesTotal','todaySales','lowStockList','topProducts','heatmap') + ['title' => 'Dashboard']);
+        $this->view('dashboard/index', compact('totalProducts','lowStock','expiring','expired','expiringSoon','todaySalesCount','todaySalesTotal','monthSalesTotal','yearSalesTotal','todaySales','lowStockList','topProducts','heatmap') + ['title' => 'Dashboard']);
     }
 }

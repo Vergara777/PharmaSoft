@@ -5,6 +5,7 @@ use App\Core\Controller;
 use App\Helpers\Auth;
 use App\Helpers\Security;
 use App\Helpers\Flash;
+use App\Helpers\Audit;
 
 class ProfileController extends Controller {
     public function index(): void {
@@ -43,6 +44,8 @@ class ProfileController extends Controller {
         (new \App\Models\User())->updateAvatar(Auth::id(), $rel);
         $_SESSION['user']['avatar'] = $rel;
         $_SESSION['user']['avatar_ver'] = time();
+        // Audit: avatar updated
+        Audit::log('user', (int)Auth::id(), 'update_avatar', ['avatar' => $rel]);
         Flash::success('Avatar actualizado correctamente', 'Perfil');
         $this->redirect('/profile');
     }
@@ -55,6 +58,7 @@ class ProfileController extends Controller {
             $this->redirect('/profile');
             return;
         }
+        $before = Auth::user() ?: [];
         $d = [
             'name' => trim((string)($_POST['name'] ?? '')),
             'email' => trim((string)($_POST['email'] ?? '')),
@@ -81,6 +85,11 @@ class ProfileController extends Controller {
         $_SESSION['user']['hire_date'] = $d['hire_date'];
         $_SESSION['user']['birth_date'] = $d['birth_date'];
         $_SESSION['user']['id_number'] = $d['id_number'];
+        // Audit: profile updated (diff)
+        $keys = ['name','email','phone','address','position','hire_date','birth_date','id_number'];
+        $beforeCut = array_intersect_key($before, array_flip($keys));
+        $changes = Audit::diff($beforeCut, $d, $keys);
+        if (!empty($changes)) { Audit::log('user', (int)Auth::id(), 'update_profile', $changes); }
         Flash::success('Perfil actualizado', 'Perfil');
         $this->redirect('/profile');
     }

@@ -53,12 +53,37 @@
     .ps-fb-warning .ps-fallback-bar { background: #f59e0b; }
     .ps-fb-error   .ps-fallback-bar { background: #ef4444; }
     .ps-fb-info    .ps-fallback-bar { background: #3b82f6; }
+    /* Top loading bar */
+    .ps-topbar { position: fixed; top: 0; left: 0; height: 3px; background: #3c8dbc; width: 0; opacity: 0; z-index: 5000; transition: width .3s ease, opacity .2s ease; }
+    /* Compact mini loader */
+    .ps-mini-loader { position: fixed; right: 16px; bottom: 16px; z-index: 4006; background: #0b1220; color: #e5e7eb; padding: 8px 12px; border-radius: 10px; display: none; align-items: center; gap: 8px; box-shadow: 0 16px 40px rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.06); }
+    .ps-mini-spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.15); border-top-color: #3b82f6; border-radius: 50%; animation: spin .9s linear infinite; }
     /* Reduced motion respect */
     @media (prefers-reduced-motion: reduce) {
       .app-spinner { animation: none; }
       .app-loading-overlay.fade-enter-active,
       .app-loading-overlay.fade-exit-active { transition: none; }
     }
+    /* Floating cart button */
+    .cart-fab { position: fixed; right: 20px; bottom: 20px; z-index: 3045; border: none; border-radius: 50%; width: 56px; height: 56px; background: #3c8dbc; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.25); display: inline-flex; align-items: center; justify-content: center; }
+    .cart-fab:hover { background: #357ea8; }
+    .cart-fab .fa-shopping-cart { font-size: 1.25rem; }
+    .cart-fab-badge { position: absolute; top: -6px; right: -6px; border-radius: 10px; font-weight: 700; }
+    /* Lightweight modal (global) */
+    .ps-modal { position: fixed; inset: 0; z-index: 3050; display: none; }
+    .ps-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.45); }
+    .ps-modal-dialog { position: relative; background: #fff; z-index: 1; max-width: 860px; width: 92%; margin: 40px auto; border-radius: 8px; box-shadow: 0 16px 40px rgba(0,0,0,.3); display: flex; flex-direction: column; max-height: calc(100vh - 80px); }
+    .ps-modal-header { padding: 12px 16px; border-bottom: 1px solid #eee; display: flex; align-items: center; position: relative; }
+    .ps-modal-body { padding: 0; max-height: calc(100vh - 190px); overflow: auto; }
+    .ps-modal-footer { padding: 10px 16px; border-top: 1px solid #eee; background: #fafafa; }
+    .ps-modal .close { background: transparent; border: 0; font-size: 1.6rem; line-height: 1; color: #333; position: absolute; right: 10px; top: 8px; padding: 4px 8px; opacity: .8; }
+    .ps-modal .close:hover { opacity: 1; }
+    @media (max-width: 576px) {
+      .ps-modal-dialog { width: 96%; margin: 10px auto; max-height: calc(100vh - 20px); }
+      .ps-modal-body { max-height: calc(100vh - 170px); }
+    }
+    /* Disable pointer events on app while busy (overlay active) */
+    body.app-busy #content, body.app-busy main, body.app-busy .wrapper { pointer-events: none; }
   </style>
 </head>
 <body class="hold-transition sidebar-mini">
@@ -139,6 +164,38 @@
   </div>
   <footer class="main-footer small"><strong>&copy; <?= date('Y') ?> PharmaSoft</strong></footer>
 </div>
+<!-- Global Floating Cart Button and Modal -->
+<button id="globalCartFab" class="cart-fab" title="Ver carrito" aria-label="Ver carrito">
+  <i class="fas fa-shopping-cart" aria-hidden="true"></i>
+  <span class="badge badge-danger cart-fab-badge" id="globalCartCount" style="display:none;">0</span>
+  <span class="sr-only">Carrito</span>
+</button>
+
+<div id="globalCartModal" class="ps-modal" style="display:none;">
+  <div class="ps-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="globalCartModalTitle">
+    <div class="ps-modal-header">
+      <h5 id="globalCartModalTitle" class="mb-0 d-flex align-items-center">
+        <i class="fas fa-shopping-cart mr-2 text-primary" aria-hidden="true"></i>
+        Carrito
+        <span class="badge badge-secondary ml-2" id="globalCartModalCount">0</span>
+      </h5>
+      <button type="button" class="close" id="globalCartModalClose" aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
+    </div>
+    <div class="ps-modal-body" id="globalCartModalBody">
+      <div class="text-muted p-3">No hay borrador de carrito en este navegador.</div>
+    </div>
+    <div class="ps-modal-footer d-flex justify-content-between align-items-center" id="globalCartModalFooter" style="display:none;">
+      <div class="text-muted small">Borrador guardado localmente.</div>
+      <div class="d-flex align-items-center" style="gap:.5rem;">
+        <div class="mr-3"><strong>Total:</strong> <span id="globalCartModalTotal">$0</span></div>
+        <a id="globalCartGoProducts" href="<?= BASE_URL ?>/products" class="btn btn-outline-secondary btn-sm"><i class="fas fa-pills mr-1"></i> Ir a productos</a>
+        <a id="globalCartGoCreateSale" href="<?= BASE_URL ?>/sales/create" class="btn btn-outline-primary btn-sm"><i class="fas fa-cash-register mr-1"></i> Ir a realizar compra</a>
+        <button type="button" class="btn btn-outline-danger btn-sm" id="globalCartModalClear"><i class="fas fa-trash mr-1"></i> Vaciar</button>
+      </div>
+    </div>
+  </div>
+  <div class="ps-modal-backdrop" id="globalCartModalBackdrop"></div>
+</div>
 <!-- Loading Overlay -->
 <div class="app-loading-overlay" id="appLoadingOverlay" aria-hidden="true">
   <div class="app-loading-box">
@@ -147,8 +204,14 @@
       <div class="font-weight-bold mb-0" id="appLoadingText">Procesando...</div>
       <small class="text-muted">Por favor, espera</small>
     </div>
-  </div>
  </div>
+</div>
+<!-- Top Loading Bar + Mini Loader -->
+<div id="psTopBar" class="ps-topbar" aria-hidden="true"></div>
+<div id="psMiniLoader" class="ps-mini-loader" role="status" aria-live="polite">
+  <div class="ps-mini-spinner" aria-hidden="true"></div>
+  <span id="psMiniLoaderText">Cargando...</span>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
@@ -193,20 +256,22 @@
       <div>
         ${title ? `<div class="ps-fallback-title">${title}</div>` : ''}
         ${text ? `<div class="ps-fallback-text">${text}</div>` : ''}
-        <div class="ps-fallback-bar"></div>
+        ${options.sticky ? '' : '<div class="ps-fallback-bar"></div>'}
       </div>
       <div class="ps-fallback-close">&times;</div>`;
     container.appendChild(el);
     const bar = el.querySelector('.ps-fallback-bar');
     const close = el.querySelector('.ps-fallback-close');
     close.addEventListener('click', () => { container.removeChild(el); });
-    // animate progress bar
-    const ttl = Math.max(2000, options.timer || 4000);
-    bar.style.transform = 'scaleX(1)';
-    bar.style.transition = `transform ${ttl}ms linear`;
-    requestAnimationFrame(() => { bar.style.transform = 'scaleX(0)'; });
-    // auto hide
-    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, ttl + 100);
+    if (!options.sticky) {
+      // animate progress bar
+      const ttl = Math.max(2000, options.timer || 4000);
+      bar.style.transform = 'scaleX(1)';
+      bar.style.transition = `transform ${ttl}ms linear`;
+      requestAnimationFrame(() => { bar.style.transform = 'scaleX(0)'; });
+      // auto hide
+      setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, ttl + 120);
+    }
   }
 
   window.notify = function(arg1, arg2) {
@@ -242,13 +307,21 @@
       // Enforce high-contrast colors
       clean.background = '#0b1220';
       clean.color = '#e5e7eb';
+      if (options.sticky) { clean.timer = undefined; clean.showCloseButton = true; }
       Toast.fire(Object.assign({}, defaults, { position: pos }, clean));
     } else {
-      domToast({ icon: type, title, text, timer: options.timer, position: options.position });
+      domToast({ icon: type, title, text, timer: options.timer, position: options.position, sticky: !!options.sticky });
     }
   }
   window.notifySuccess = (msg) => notify('success', msg);
   window.notifyError = (msg) => notify('error', msg);
+  // Sticky helpers
+  window.notifySticky = function(icon, title, text){
+    notify({ icon: icon || 'info', title: title || '', text: text || '', sticky: true });
+  }
+  window.notifyExpiry = function(text){
+    notify({ icon: 'error', title: 'Alerta de vencimiento', text: text || '', sticky: true });
+  }
 
   // Signal readiness and allow debug via ?debug_toast=1
   window.__psNotifyReady = true;
@@ -258,6 +331,129 @@
     if (p.has('debug_toast')) {
       notify({ icon:'warning', title:'Debug Toast', text:'notify() está funcionando.' });
     }
+  })();
+
+  // Global navigation loading (all internal links)
+  (function(){
+    function sameOrigin(href){
+      try { var u=new URL(href, window.location.origin); return u.origin === window.location.origin; } catch(e){ return false; }
+    }
+    $(document).on('click', 'a[href]', function(e){
+      var href = this.getAttribute('href'); if (!href) return;
+      if (href.startsWith('#') || href.startsWith('javascript:')) return;
+      if (this.target && this.target === '_blank') return;
+      if (!sameOrigin(href)) return;
+      try { if (window.loadingBar) window.loadingBar.start('Cargando...'); } catch(_){ }
+      // allow navigation to proceed normally
+    });
+    window.addEventListener('beforeunload', function(){ try { if (window.loadingBar) window.loadingBar.start('Cargando...'); } catch(_){ } });
+  })();
+
+  // Global Cart (floating) available on all pages
+  (function globalCart(){
+    var KEY = 'pharmasoft_sales_draft';
+    var LEGACY = 'pharmasoft_pending_cart';
+    var fab = document.getElementById('globalCartFab');
+    var fabCount = document.getElementById('globalCartCount');
+    var modal = document.getElementById('globalCartModal');
+    var mBody = document.getElementById('globalCartModalBody');
+    var mFooter = document.getElementById('globalCartModalFooter');
+    var mCount = document.getElementById('globalCartModalCount');
+    var mTotal = document.getElementById('globalCartModalTotal');
+    var mClose = document.getElementById('globalCartModalClose');
+    var mBackdrop = document.getElementById('globalCartModalBackdrop');
+    var mClear = document.getElementById('globalCartModalClear');
+    var btnGoProducts = document.getElementById('globalCartGoProducts');
+    var btnGoCreateSale = document.getElementById('globalCartGoCreateSale');
+    function isOnProducts(){
+      try { var p=(window.location.pathname||'').toLowerCase(); return p.indexOf('/products') !== -1; } catch(e){ return false; }
+    }
+    function isOnCreateSale(){
+      try { var p=(window.location.pathname||'').toLowerCase(); return p.indexOf('/sales/create') !== -1; } catch(e){ return false; }
+    }
+
+    function fmt(n){ try { return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0}).format(n||0); } catch(e){ var v=Math.round(n||0); return '$'+String(v).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); } }
+    function migrate(){ try { var old = localStorage.getItem(LEGACY); if (old && !localStorage.getItem(KEY)) { localStorage.setItem(KEY, old); localStorage.removeItem(LEGACY); } } catch(_){} }
+    function read(){ migrate(); try { var raw = localStorage.getItem(KEY); var arr = raw ? JSON.parse(raw||'[]')||[] : []; return Array.isArray(arr)?arr:[]; } catch(_){ return []; } }
+    function write(arr){ try { if (arr && arr.length) localStorage.setItem(KEY, JSON.stringify(arr)); else localStorage.removeItem(KEY); } catch(_){} }
+    function total(arr){ var t=0; (arr||[]).forEach(function(it){ var q=parseInt(it.qty||0,10)||0; var p=Math.round(parseFloat(it.unit_price||0)||0); t+=q*p; }); return t; }
+    function render(){
+      var items = read();
+      var cnt = items.length;
+      if (fabCount){ fabCount.style.display = cnt>0?'inline-block':'none'; fabCount.textContent = String(cnt); }
+      if (mCount){ mCount.textContent = String(cnt); }
+      // Toggle footer CTAs depending on location
+      try {
+        if (btnGoProducts) btnGoProducts.style.display = isOnProducts() ? 'none' : '';
+        if (btnGoCreateSale) btnGoCreateSale.style.display = isOnCreateSale() ? 'none' : '';
+      } catch(_){ }
+      if (!cnt){
+        var emptyHtml = '<div class="p-4 text-center">\
+          <div class="text-muted mb-3">No hay borrador de carrito.</div>';
+        if (!isOnProducts()) {
+          emptyHtml += ' <a href="<?= BASE_URL ?>/products" class="btn btn-sm btn-primary"><i class="fas fa-pills mr-1"></i> Ir a productos</a>';
+        }
+        emptyHtml += '</div>';
+        if (mBody) mBody.innerHTML = emptyHtml;
+        if (mFooter) mFooter.style.display = 'none';
+        if (mTotal) mTotal.textContent = fmt(0);
+        return;
+      }
+      var html = '\n<div class="table-responsive">\n<table class="table table-sm table-hover mb-0">\n<thead><tr><th>#</th><th>SKU</th><th>Producto</th><th class="text-right">Cant.</th><th class="text-right">P. Unit</th><th class="text-right">Importe</th><th></th></tr></thead><tbody>';
+      for (var i=0;i<items.length;i++){
+        var it = items[i]||{}; var idx=i+1;
+        var img = it.image ? '<?= BASE_URL ?>/uploads/'+it.image : '';
+        var name = (it.name||'').replace(/</g,'&lt;');
+        var sku = (it.sku||'').replace(/</g,'&lt;');
+        var q = Math.max(1, parseInt(it.qty||1,10)||1);
+        var p = Math.max(0, Math.round(parseFloat(it.unit_price||0)||0));
+        var imp = q*p;
+        html += '<tr data-i="'+i+'">'
+          + '<td>'+idx+'</td>'
+          + '<td>'+sku+'</td>'
+          + '<td>' + (img?('<img src="'+img+'" alt="" style="width:42px;height:42px;object-fit:cover;border-radius:4px;border:1px solid #eee;margin-right:8px;vertical-align:middle;">'):'') + name + '</td>'
+          + '<td class="text-right">'+q+'</td>'
+          + '<td class="text-right">'+fmt(p)+'</td>'
+          + '<td class="text-right">'+fmt(imp)+'</td>'
+          + '<td class="text-right"><button type="button" class="btn btn-sm btn-outline-danger btnRemoveItem" title="Quitar"><i class="fas fa-trash"></i></button></td>'
+          + '</tr>';
+      }
+      html += '</tbody></table></div>';
+      if (mBody) mBody.innerHTML = html;
+      if (mFooter) mFooter.style.display = '';
+      if (mTotal) mTotal.textContent = fmt(total(items));
+      var btns = mBody ? mBody.querySelectorAll('.btnRemoveItem') : [];
+      if (btns && btns.forEach){ btns.forEach(function(b){ b.addEventListener('click', function(){
+        try { if (window.loadingBar) window.loadingBar.start('Quitando...'); } catch(_){ }
+        var tr=b.closest('tr'); var idx = tr ? parseInt(tr.getAttribute('data-i')||'-1',10) : -1; var arr = read();
+        if (idx>=0 && idx < arr.length){ arr.splice(idx,1); write(arr); render(); }
+        try { if (window.loadingBar) window.loadingBar.stop(); } catch(_){ }
+      }); }); }
+    }
+    function open(){ if (!modal) return; render(); modal.style.display='block'; document.body.style.overflow='hidden'; }
+    function close(){ if (!modal) return; modal.style.display='none'; document.body.style.overflow=''; }
+    if (fab) fab.addEventListener('click', function(e){ e.preventDefault(); open(); });
+    if (mClose) mClose.addEventListener('click', function(){ close(); });
+    if (mBackdrop) mBackdrop.addEventListener('click', function(e){ if (e.target===mBackdrop) close(); });
+    if (mClear) mClear.addEventListener('click', function(){
+      try {
+        if (window.Swal && Swal.fire) {
+          return Swal.fire({ title:'Vaciar carrito', text:'¿Desea vaciar el borrador del carrito?', icon:'warning', showCancelButton:true, confirmButtonText:'Sí, vaciar', cancelButtonText:'No' }).then(function(res){ if (res && res.isConfirmed) { write([]); render(); } });
+        }
+      } catch(_){}
+      if (confirm('¿Desea vaciar el borrador del carrito?')) { write([]); render(); }
+    });
+    // expose for live control from any page
+    window.psCart = window.psCart || {};
+    window.psCart.refresh = render;
+    window.psCart.clear = function(){ try { write([]); render(); } catch(_){ render(); } };
+    // initial badge update
+    render();
+    // Ensure initial footer CTA visibility per location
+    try {
+      if (btnGoProducts) btnGoProducts.style.display = isOnProducts() ? 'none' : '';
+      if (btnGoCreateSale) btnGoCreateSale.style.display = isOnCreateSale() ? 'none' : '';
+    } catch(_){ }
   })();
 
   // Generic confirmation helper
@@ -274,14 +470,108 @@
     return Swal.fire({ title, text, icon, showCancelButton: true, confirmButtonText: confirmText, cancelButtonText: cancelText, confirmButtonColor, cancelButtonColor }).then(r => r.isConfirmed);
   }
 
-  // Loading Overlay API
+  // Loading Overlay API (with minimum visible duration)
   const overlay = document.getElementById('appLoadingOverlay');
   const overlayText = document.getElementById('appLoadingText');
+  let __olMin = 3500; // ms (preferencia UX 3–4s)
+  let __olStartedAt = 0;
+  let __olHideTimer = null;
+  let __olActive = false;
+  function __olDoHide(){
+    overlay.style.display = 'none';
+    overlay.setAttribute('aria-hidden', 'true');
+    try { document.body.style.overflow = ''; } catch(_){}
+    try { document.body.classList.remove('app-busy'); } catch(_){}
+    try { document.body.setAttribute('aria-busy','false'); } catch(_){}
+    __olActive = false; __olStartedAt = 0; __olHideTimer = null;
+  }
   window.bannerLoading = function(show, text) {
     if (typeof text === 'string' && text) overlayText.textContent = text; else overlayText.textContent = 'Procesando...';
-    overlay.style.display = show ? 'flex' : 'none';
-    overlay.setAttribute('aria-hidden', show ? 'false' : 'true');
+    if (show) {
+      if (__olHideTimer) { try { clearTimeout(__olHideTimer); } catch(_){} __olHideTimer = null; }
+      // Ensure overlay fully covers and blocks interaction
+      try { overlay.style.position = 'fixed'; overlay.style.inset = '0'; overlay.style.zIndex = '2050'; } catch(_){ }
+      overlay.style.display = 'flex';
+      overlay.setAttribute('aria-hidden', 'false');
+      try { document.body.style.overflow = 'hidden'; } catch(_){}
+      try { document.body.classList.add('app-busy'); } catch(_){}
+      try { document.body.setAttribute('aria-busy','true'); } catch(_){}
+      if (!__olActive) { __olActive = true; __olStartedAt = Date.now(); }
+    } else {
+      if (!__olActive) { __olDoHide(); return; }
+      const elapsed = Math.max(0, Date.now() - __olStartedAt);
+      const remaining = Math.max(0, __olMin - elapsed);
+      if (remaining > 0) {
+        if (__olHideTimer) { try { clearTimeout(__olHideTimer); } catch(_){} }
+        __olHideTimer = setTimeout(__olDoHide, remaining);
+      } else {
+        __olDoHide();
+      }
+    }
   }
+  // Allow runtime adjustment: window.bannerLoadingMinDuration = 4000
+  try {
+    Object.defineProperty(window, 'bannerLoadingMinDuration', {
+      get: function(){ return __olMin; },
+      set: function(v){ __olMin = Math.max(0, parseInt(v, 10) || 0); }
+    });
+  } catch(_){ }
+
+  // Top bar + mini loader API (with minimum visible duration)
+  const topBar = document.getElementById('psTopBar');
+  const miniLoader = document.getElementById('psMiniLoader');
+  const miniLoaderText = document.getElementById('psMiniLoaderText');
+  let __lbMin = 6000; // ms, keep loader visible at least 6s
+  let __lbStartedAt = 0;
+  let __lbHideTimer = null;
+  let __lbActive = false;
+  function __lbDoHide(){
+    try { if (miniLoader) miniLoader.style.display = 'none'; } catch(_){ }
+    if (!topBar) { __lbActive = false; __lbStartedAt = 0; __lbHideTimer = null; return; }
+    topBar.style.width = '100%';
+    setTimeout(function(){
+      topBar.style.opacity = '0';
+      topBar.style.width = '0';
+      __lbActive = false;
+      __lbStartedAt = 0;
+      __lbHideTimer = null;
+    }, 250);
+  }
+  window.loadingBar = {
+    start: function(text){
+      // Clear any pending hide to extend duration when new operation starts
+      if (__lbHideTimer) { try { clearTimeout(__lbHideTimer); } catch(_){} __lbHideTimer = null; }
+      if (miniLoaderText && text) miniLoaderText.textContent = text;
+      if (miniLoader) miniLoader.style.display = 'flex';
+      if (!__lbActive) {
+        __lbActive = true;
+        __lbStartedAt = Date.now();
+        if (topBar) {
+          topBar.style.opacity = '1';
+          topBar.style.width = '15%';
+          requestAnimationFrame(function(){ topBar.style.width = '70%'; });
+        }
+      }
+    },
+    stop: function(){
+      if (!__lbActive) return; // nothing to hide
+      const elapsed = Math.max(0, Date.now() - __lbStartedAt);
+      const remaining = Math.max(0, __lbMin - elapsed);
+      if (remaining > 0) {
+        if (__lbHideTimer) { try { clearTimeout(__lbHideTimer); } catch(_){} }
+        __lbHideTimer = setTimeout(__lbDoHide, remaining);
+      } else {
+        __lbDoHide();
+      }
+    }
+  };
+  // Allow runtime adjustment of minimum duration: window.loadingBar.minDuration = 4000
+  try {
+    Object.defineProperty(window.loadingBar, 'minDuration', {
+      get: function(){ return __lbMin; },
+      set: function(v){ __lbMin = Math.max(0, parseInt(v, 10) || 0); }
+    });
+  } catch(_){ }
 
   // Auto-show on form submit (supports data-loading-text on form or submit button)
   $(document).on('submit', 'form', function(e){
@@ -289,9 +579,9 @@
     const text = (btn && btn.getAttribute('data-loading-text')) || this.getAttribute('data-loading-text') || 'Enviando datos...';
     bannerLoading(true, text);
   });
-  // Auto-show during jQuery AJAX
-  $(document).ajaxStart(function(){ bannerLoading(true, 'Cargando...'); });
-  $(document).ajaxStop(function(){ bannerLoading(false); });
+  // Auto-show during jQuery AJAX (top bar + mini loader)
+  $(document).ajaxStart(function(){ loadingBar.start('Cargando...'); });
+  $(document).ajaxStop(function(){ loadingBar.stop(); });
   // Notify on AJAX errors
   $(document).ajaxError(function(_evt, jqxhr, settings, err){
     try {
@@ -302,13 +592,13 @@
     } catch(e){}
   });
 
-  // Auto-show during native fetch as well
+  // Auto-show during native fetch as well (top bar + mini)
   (function(){
     if (!window.fetch) return;
     const _fetch = window.fetch.bind(window);
     window.fetch = function(input, init) {
-      try { bannerLoading(true, 'Cargando...'); } catch(e){}
-      return _fetch(input, init).finally(() => { try { bannerLoading(false); } catch(e){} });
+      try { loadingBar.start('Cargando...'); } catch(e){}
+      return _fetch(input, init).finally(() => { try { loadingBar.stop(); } catch(e){} });
     }
   })();
 

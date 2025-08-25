@@ -31,10 +31,9 @@
       #pickPreview { display:flex; gap:12px; align-items:center; margin-top:6px; }
       #pickPreview img { width:72px; height:72px; object-fit:cover; border-radius:6px; border:1px solid #e5e5e5; display:none; }
       #pickPreview .meta { font-size:.9rem; color:#555; }
-      /* On md and up, hide inline preview to keep fields perfectly aligned */
-      @media (min-width: 768px) {
-        #pickPreview { display:none; }
-      }
+      /* Always show preview on all sizes to give immediate visual feedback */
+      /* (si deseas ocultarlo en desktop, podemos volver a activar este bloque) */
+      /* @media (min-width: 768px) { #pickPreview { display:none; } } */
       /* Choices.js tweaks */
       .choices__list--dropdown .choice__inner { display:flex; align-items:center; gap:8px; }
       .choice__img { width:28px; height:28px; border-radius:4px; object-fit:cover; flex:0 0 28px; border:1px solid #e5e5e5; }
@@ -66,6 +65,38 @@
     </style>
     <!-- Choices.js (vanilla) for rich select rendering -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+    <!-- Banner: borrador detectado/restaurado -->
+    <div id="draftBanner" class="alert alert-warning d-none" role="alert" style="display:none;">
+      <style>
+        #draftBanner .banner-actions .btn { font-weight: 700; border-width: 2px; border-radius: 999px; }
+        #draftBanner .btn-continue { background: #3c8dbc; color: #fff; border-color: #2f6f92; }
+        #draftBanner .btn-continue:hover { background: #357ea8; color: #fff; }
+        #draftBanner .btn-products { background: #fff; color: #3c8dbc; border-color: #3c8dbc; }
+        #draftBanner .btn-products:hover { background: #e8f3fb; color: #2b6d8c; }
+        #draftBanner .btn-discard { background: #fff; color: #dc3545; border-color: #dc3545; }
+        #draftBanner .btn-discard:hover { background: #fbe9eb; color: #b02a37; }
+      </style>
+      <div class="d-flex align-items-center">
+        <i class="fas fa-exclamation-triangle mr-2 text-warning" aria-hidden="true"></i>
+        <div class="flex-grow-1">
+          <strong>Continuas con un borrador de venta</strong>
+          <span class="badge badge-pill badge-dark ml-2" id="draftCount" title="Cantidad de ítems en el borrador">0 ítems</span>
+          <div class="text-muted small mt-1">Puedes seguir editando, ir a Productos o descartar el borrador.</div>
+        </div>
+        <div class="ml-3 d-flex banner-actions" style="gap:.5rem;">
+          <button type="button" id="btnDraftContinue" class="btn btn-sm btn-continue">
+            <i class="fas fa-edit mr-1" aria-hidden="true"></i> Continuar editando
+          </button>
+          <a href="<?= BASE_URL ?>/products" class="btn btn-sm btn-products">
+            <i class="fas fa-store mr-1" aria-hidden="true"></i> Ir a Productos
+          </a>
+          <button type="button" id="btnDraftDiscard" class="btn btn-sm btn-discard">
+            <i class="fas fa-trash-alt mr-1" aria-hidden="true"></i> Descartar borrador
+          </button>
+        </div>
+      </div>
+    </div>
+
     <?php if (!empty($error)): ?>
       <div class="alert alert-danger"><?= View::e($error) ?></div>
     <?php endif; ?>
@@ -165,6 +196,14 @@
         <i class="fas fa-save mr-1" aria-hidden="true"></i>
         Guardar venta
       </button>
+      <button type="button" class="btn btn-outline-primary" id="btnSaveDraft">
+        <i class="fas fa-bookmark mr-1" aria-hidden="true"></i>
+        Guardar borrador
+      </button>
+      <a class="btn btn-outline-secondary" id="btnBackToProducts" href="<?= BASE_URL ?>/products">
+        <i class="fas fa-store mr-1" aria-hidden="true"></i>
+        Seguir viendo productos
+      </a>
       <a class="btn btn-secondary" href="<?= BASE_URL ?>/sales">
         <i class="fas fa-times mr-1" aria-hidden="true"></i>
         Cancelar
@@ -193,6 +232,51 @@
 
 <script>
   (function(){
+    // CSS.escape polyfill (MDN) to ensure compatibility across browsers
+    if (!window.CSS) window.CSS = {};
+    if (typeof window.CSS.escape !== 'function') {
+      window.CSS.escape = function(value) {
+        if (arguments.length === 0) throw new TypeError('`CSS.escape` requires an argument.');
+        var string = String(value);
+        var length = string.length;
+        var index = -1;
+        var codeUnit;
+        var result = '';
+        var firstCodeUnit = string.charCodeAt(0);
+        while (++index < length) {
+          codeUnit = string.charCodeAt(index);
+          // Note: there’s no need to special-case astral symbols, surrogate
+          // pairs, or lone surrogates.
+          if (codeUnit == 0x0000) {
+            result += '\\FFFD';
+            continue;
+          }
+          if (
+            (codeUnit >= 0x0001 && codeUnit <= 0x001F) ||
+            codeUnit == 0x007F ||
+            (index == 0 && codeUnit >= 0x0030 && codeUnit <= 0x0039) ||
+            (index == 1 && codeUnit >= 0x0030 && codeUnit <= 0x0039 && firstCodeUnit == 0x002D)
+          ) {
+            result += '\\' + codeUnit.toString(16) + ' ';
+            continue;
+          }
+          if (
+            index == 0 && codeUnit == 0x002D && length == 1 ||
+            codeUnit >= 0x0080 ||
+            codeUnit == 0x002D ||
+            codeUnit == 0x005F ||
+            (codeUnit >= 0x0030 && codeUnit <= 0x0039) ||
+            (codeUnit >= 0x0041 && codeUnit <= 0x005A) ||
+            (codeUnit >= 0x0061 && codeUnit <= 0x007A)
+          ) {
+            result += string.charAt(index);
+            continue;
+          }
+          result += '\\' + string.charAt(index);
+        }
+        return result;
+      };
+    }
     const sel = document.querySelector('select[name="product_pick"]');
     const qty = document.getElementById('pickQty');
     const price = document.getElementById('pickPrice');
@@ -225,56 +309,71 @@
       }
     }
 
-    // Lightweight confirm modal (always available on this page)
-    var __cmWrap, __cmTitle, __cmText, __cmOk, __cmCancel, __cmOnOk;
-    function ensureConfirmModal(){
-      if (__cmWrap) return;
-      var wrap = document.createElement('div');
-      wrap.id = 'confirmModal';
-      wrap.style.position = 'fixed';
-      wrap.style.left = 0; wrap.style.top = 0; wrap.style.right = 0; wrap.style.bottom = 0;
-      wrap.style.background = 'rgba(0,0,0,0.45)';
-      wrap.style.display = 'none';
-      wrap.style.alignItems = 'center';
-      wrap.style.justifyContent = 'center';
-      wrap.style.zIndex = 1050;
-      wrap.innerHTML = '\
-        <div style="background:#fff; max-width:520px; width:92%; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.2); overflow:hidden;">\
-          <div style="padding:14px 18px; border-bottom:1px solid #eee; display:flex; align-items:center;">\
-            <div class="mr-2" style="width:28px; height:28px; border-radius:50%; background:#f8d7da; color:#721c24; display:flex; align-items:center; justify-content:center; font-weight:700;">!</div>\
-            <h5 id="cmTitle" style="margin:0; font-weight:600;">Confirmación</h5>\
-          </div>\
-          <div style="padding:18px; color:#444;"><div id="cmText">¿Deseas continuar?</div></div>\
-          <div style="padding:12px 18px; border-top:1px solid #eee; display:flex; justify-content:flex-end; gap:8px;">\
-            <button id="cmCancel" type="button" class="btn btn-secondary">Cancelar</button>\
-            <button id="cmOk" type="button" class="btn btn-danger">Aceptar</button>\
-          </div>\
-        </div>';
-      document.body.appendChild(wrap);
-      __cmWrap = wrap;
-      __cmTitle = wrap.querySelector('#cmTitle');
-      __cmText = wrap.querySelector('#cmText');
-      __cmOk = wrap.querySelector('#cmOk');
-      __cmCancel = wrap.querySelector('#cmCancel');
-      __cmCancel.addEventListener('click', function(){ hideConfirmModal(); });
-      wrap.addEventListener('click', function(e){ if (e.target === wrap) hideConfirmModal(); });
-      __cmOk.addEventListener('click', function(){ var fn = __cmOnOk; __cmOnOk = null; hideConfirmModal(); if (typeof fn === 'function') fn(); });
+    // Pretty confirm helper (Swal -> psConfirm -> native)
+    function confirmPretty(opts){
+      opts = opts || {};
+      var title = opts.title || 'Confirmación';
+      var text = opts.text || '¿Deseas continuar?';
+      var ok = opts.ok || 'Sí';
+      var cancel = opts.cancel || 'No';
+      try {
+        if (window.Swal && Swal.fire) {
+          return Swal.fire({ title: title, text: text, icon: opts.icon || 'question', showCancelButton: true, confirmButtonText: ok, cancelButtonText: cancel }).then(function(r){ return !!(r && r.isConfirmed); });
+        }
+        if (window.psConfirm) { return window.psConfirm({ title: title, text: text, ok: ok, cancel: cancel }); }
+      } catch(_){ }
+      return Promise.resolve(confirm(text));
     }
-    function showConfirmModal(title, text, okLabel, onOk){
-      ensureConfirmModal();
-      __cmTitle.textContent = title || 'Confirmación';
-      __cmText.textContent = text || '¿Deseas continuar?';
-      __cmOk.textContent = okLabel || 'Aceptar';
-      __cmOnOk = onOk || null;
-      __cmWrap.style.display = 'flex';
-    }
-    function hideConfirmModal(){ if (!__cmWrap) return; __cmWrap.style.display = 'none'; }
-    function confirmModal(title, text, okLabel, onOk){ showConfirmModal(title, text, okLabel, onOk); }
 
     function fmtCOP(n){
       try { return new Intl.NumberFormat('es-CO', { style:'currency', currency:'COP', minimumFractionDigits:0, maximumFractionDigits:0 }).format(n||0); }
       catch(e){ var v = Math.round(n||0); return '$' + String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
     }
+    // Draft autosave
+    var DRAFT_KEY = 'pharmasoft_sales_draft';
+    function serializeCart(){
+      var items = [];
+      body.querySelectorAll('tr').forEach(function(tr){
+        try {
+          var pid = parseInt((tr.querySelector('input[name="product_id[]"]')||{}).value||'0',10)||0;
+          if (!pid) return;
+          var qtyEl = tr.querySelector('input[name="qty[]"]');
+          var prEl = tr.querySelector('input[name="unit_price[]"]');
+          var nameText = (tr.querySelector('td:nth-child(3) span')||{}).textContent || '';
+          var skuText = (tr.querySelector('td:nth-child(2)')||{}).textContent || '';
+          var imgEl = tr.querySelector('td:nth-child(3) img');
+          var img = imgEl ? (imgEl.getAttribute('src')||'').split('/').pop() : '';
+          items.push({
+            product_id: pid,
+            sku: skuText.trim(),
+            name: nameText.trim(),
+            qty: Math.max(1, parseInt((qtyEl&&qtyEl.value)||'1',10)||1),
+            unit_price: Math.max(0, Math.round(parseFloat((prEl&&prEl.value)||'0')||0)),
+            image: img
+          });
+        } catch(_){ }
+      });
+      return items;
+    }
+    function saveDraft(){
+      try {
+        var items = serializeCart();
+        if (items.length > 0) localStorage.setItem(DRAFT_KEY, JSON.stringify(items));
+        else localStorage.removeItem(DRAFT_KEY);
+      } catch(_){ }
+    }
+    function loadDraft(){
+      try {
+        var raw = localStorage.getItem(DRAFT_KEY);
+        if (!raw) return 0;
+        var arr = JSON.parse(raw||'[]')||[];
+        if (Array.isArray(arr) && arr.length){ arr.forEach(function(it){ addItemFromData(it||{}); }); return arr.length; }
+        return 0;
+      } catch(_){ }
+      return 0;
+    }
+    function clearDraft(){ try { localStorage.removeItem(DRAFT_KEY); } catch(_){ } }
+
     function recalc(){
       let t = 0;
       body.querySelectorAll('tr').forEach(tr => {
@@ -286,6 +385,10 @@
       });
       totalEl.textContent = fmtCOP(t);
       toggleSubmit();
+      saveDraft();
+      try { if (typeof setDraftBannerCount === 'function') setDraftBannerCount(); } catch(_){ }
+      // Refresh global cart badge/modal instantly if available
+      try { if (window.psCart && typeof window.psCart.refresh === 'function') window.psCart.refresh(); } catch(_){ }
     }
     function toggleSubmit(){
       if (!submitBtn) return;
@@ -293,24 +396,42 @@
       submitBtn.disabled = !hasItems;
       submitBtn.classList.toggle('disabled', !hasItems);
       submitBtn.title = hasItems ? '' : 'Agrega al menos un producto';
+      var saveBtn = document.getElementById('btnSaveDraft');
+      if (saveBtn) { saveBtn.disabled = !hasItems; saveBtn.classList.toggle('disabled', !hasItems); }
     }
     function updatePickerFromSelection(){
-      const opt = sel && sel.options[sel.selectedIndex];
-      if (!opt || !opt.value) {
+      // Resolve selected option robustly (works with Choices.js)
+      let opt = null, cp = null;
+      if (sel) {
+        const val = sel.value;
+        if (val) { opt = sel.querySelector('option[value="' + CSS.escape(val) + '"]'); }
+        if (!opt) { opt = sel.options[sel.selectedIndex]; }
+        try {
+          if (typeof __choicesInst !== 'undefined' && __choicesInst) {
+            var arr = __choicesInst.getValue(); // array of selected items
+            var selChoice = Array.isArray(arr) ? (arr[0] || null) : (arr || null);
+            if (selChoice && selChoice.customProperties) cp = selChoice.customProperties;
+          }
+        } catch(_){ }
+      }
+      if ((!opt || !opt.value) && !cp) {
         if (pv.img) { pv.img.style.display = 'none'; }
         if (pv.name) pv.name.textContent = '—';
         return;
       }
-      const dp = opt.getAttribute('data-price');
-      const ds = parseInt(opt.getAttribute('data-stock') || '0', 10) || 0;
-      const status = opt.getAttribute('data-status') || 'ok';
+      const dpAttr = opt ? opt.getAttribute('data-price') : null;
+      const dp = (dpAttr !== null) ? dpAttr : (cp ? cp.price : null);
+      const dsAttr = opt ? (opt.getAttribute('data-stock') || '') : '';
+      const ds = (dsAttr !== '' ? parseInt(dsAttr, 10) : (cp && cp.stock !== '' ? parseInt(cp.stock, 10) : 0)) || 0;
+      const status = (opt && opt.getAttribute('data-status')) || (cp ? cp.status : 'ok') || 'ok';
+      const nameTxt = (opt && (opt.getAttribute('data-name') || opt.textContent)) || (cp ? cp.name : '') || '';
       if (dp !== null) {
-        const v = Math.round(parseFloat(dp || '0') || 0);
+        const v = Math.round(parseFloat(String(dp) || '0') || 0);
         price.value = String(v);
       }
-      if (pv.name) pv.name.textContent = (opt.getAttribute('data-name') || opt.textContent || '').trim();
+      if (pv.name) pv.name.textContent = String(nameTxt).trim();
       if (pv.badges) pv.badges.innerHTML = badgeFor(status);
-      const imgName = opt.getAttribute('data-image') || '';
+      const imgName = (opt && opt.getAttribute('data-image')) || (cp ? cp.image : '') || '';
       if (pv.img) {
         if (imgName) { pv.img.src = '<?= BASE_URL ?>/uploads/' + imgName; pv.img.style.display = ''; }
         else { pv.img.removeAttribute('src'); pv.img.style.display = 'none'; }
@@ -324,20 +445,103 @@
       if (status === 'warn') return '<span class="badge badge-warning ml-2">Próx. a vencer</span>';
       return '<span class="badge badge-success ml-2">OK</span>';
     }
+    // Append item to cart from data (used for localStorage pending cart)
+    function addItemFromData(d){
+      var pid = parseInt((d && d.product_id) || '0', 10) || 0;
+      if (!pid) return;
+      var sku = d.sku || '';
+      var name = d.name || '';
+      var desc = d.description || '';
+      var status = (d.status || 'ok');
+      var stock = parseInt(d.stock || '0', 10) || 0;
+      var imgName = d.image || '';
+      var q = Math.max(1, parseInt(d.qty || '1', 10) || 1);
+      if (stock > 0 && q > stock) q = stock;
+      var p = Math.max(0, Math.round(parseFloat(d.unit_price || '0') || 0));
+      // build row (same layout as addItem)
+      var tr = document.createElement('tr');
+      var idx = body.querySelectorAll('tr').length + 1;
+      var imgHtml = imgName ? `<img src="<?= BASE_URL ?>/uploads/${imgName}" alt="${name}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;margin-right:10px;vertical-align:middle;">` : '';
+      tr.innerHTML = `
+        <td class="align-middle">${idx}</td>
+        <td class="align-middle">${sku}</td>
+        <td class="align-middle" title="Precio: ${fmtCOP(p)} | Stock: ${isNaN(stock)?0:stock}">${imgHtml}<div class="d-flex flex-column"><span>${name} ${badgeFor(status)}</span>${desc ? `<small class=\"text-muted\">${desc}</small>` : ''}</div></td>
+        <td class="text-right"><input type="number" class="form-control form-control-sm text-right" name="qty[]" min="1" step="1" value="${q}"></td>
+        <td class="text-right"><input type="number" class="form-control form-control-sm text-right" name="unit_price[]" min="0" step="1" value="${p}"></td>
+        <td class="text-right line-import">$0</td>
+        <td>
+          <input type="hidden" name="product_id[]" value="${pid}">
+          <button type="button" class="btn btn-sm btn-info btnRowInfo" title="Ver detalles">
+            <i class="fas fa-info-circle mr-1" aria-hidden="true"></i>
+            Detalles
+          </button>
+          <button type="button" class="btn btn-sm btn-danger btnRemove">
+            <i class="fas fa-trash-alt mr-1" aria-hidden="true"></i>
+            Quitar
+          </button>
+        </td>`;
+      body.appendChild(tr);
+      var qtyInput = tr.querySelector('input[name="qty[]"]');
+      qtyInput.max = Number.isFinite(stock) && stock > 0 ? String(stock) : '';
+      qtyInput.addEventListener('input', function(){
+        let v = parseInt(qtyInput.value || '1', 10);
+        if (Number.isFinite(stock) && stock > 0 && v > stock) { v = stock; centerNotify('info','Cantidad ajustada','Stock disponible: ' + stock); }
+        if (v < 1 || isNaN(v)) { v = 1; }
+        qtyInput.value = String(v);
+        recalc();
+      });
+      tr.querySelector('input[name="unit_price[]"]').addEventListener('input', recalc);
+      var btnInfo = tr.querySelector('.btnRowInfo');
+      if (btnInfo) {
+        btnInfo.addEventListener('click', function(){
+          const qNow = parseInt(tr.querySelector('input[name="qty[]"]').value || '0', 10) || 0;
+          const pNow = Math.round(parseFloat(tr.querySelector('input[name="unit_price[]"]').value || '0')) || 0;
+          const impNow = qNow * pNow;
+          showItemDetails({ sku: sku, name: name, img: imgName ? '<?= BASE_URL ?>/uploads/' + imgName : '', desc: desc, qty: qNow, unit: pNow, importe: impNow });
+        });
+      }
+      tr.querySelector('.btnRemove').addEventListener('click', function(){
+        try { if (window.loadingBar) window.loadingBar.start('Quitando...'); } catch(_){ }
+        // Remover inmediatamente sin confirmación
+        tr.remove();
+        resequence();
+        recalc();
+        centerNotify('info','Artículo quitado','Se quitó "' + name + '" del carrito.');
+        try { if (window.loadingBar) window.loadingBar.stop(); } catch(_){ }
+      });
+      recalc();
+    }
     function addItem(){
-      const opt = sel.options[sel.selectedIndex];
+      try { if (window.loadingBar) window.loadingBar.start('Agregando...'); } catch(_){ }
+      // Resolve selected option robustly (in case of Choices.js)
+      let opt = null; let cp = null;
+      if (sel) {
+        const val = sel.value;
+        if (val) { opt = sel.querySelector('option[value="' + CSS.escape(val) + '"]'); }
+        if (!opt) { opt = sel.options[sel.selectedIndex]; }
+        try {
+          if (typeof __choicesInst !== 'undefined' && __choicesInst) {
+            var arr = __choicesInst.getValue();
+            var selChoice = Array.isArray(arr) ? (arr[0] || null) : (arr || null);
+            if (selChoice && selChoice.customProperties) cp = selChoice.customProperties;
+          }
+        } catch(_){ }
+      }
       const pid = parseInt(opt && opt.value ? opt.value : '0', 10);
       if (!pid) { centerNotify('warning','Aviso','Selecciona un producto'); return; }
       if (opt.getAttribute('data-expired') === '1') { centerNotify('error','Producto vencido','No se puede vender'); return; }
-      const sku = opt.getAttribute('data-sku') || '';
-      const name = opt.getAttribute('data-name') || opt.textContent.trim();
-      const desc = opt.getAttribute('data-description') || '';
-      const status = opt.getAttribute('data-status') || 'ok';
-      const stock = parseInt(opt.getAttribute('data-stock') || '0', 10);
-      const imgName = opt.getAttribute('data-image') || '';
-      if (!isFinite(stock) || stock <= 0) { centerNotify('info','Sin stock','Este producto no tiene stock disponible'); return; }
+      const sku = (opt && (opt.getAttribute('data-sku'))) || (cp ? cp.sku : '') || '';
+      const name = (opt && (opt.getAttribute('data-name') || opt.textContent.trim())) || (cp ? cp.name : '') || '';
+      const desc = (opt && (opt.getAttribute('data-description'))) || (cp ? cp.description : '') || '';
+      const status = (opt && (opt.getAttribute('data-status'))) || (cp ? cp.status : 'ok') || 'ok';
+      const stockRaw = (opt && opt.getAttribute('data-stock'));
+      const stock = (stockRaw === null || stockRaw === '') ? NaN : parseInt(stockRaw, 10);
+      const imgName = (opt && opt.getAttribute('data-image')) || (cp ? cp.image : '') || '';
       let q = Math.max(1, parseInt(qty.value || '1', 10));
-      if (q > stock) { centerNotify('warning','Cantidad ajustada','Supera stock disponible (' + stock + '). Se ajustó a ' + stock); q = stock; }
+      if (Number.isFinite(stock) && stock > 0 && q > stock) {
+        centerNotify('warning','Cantidad ajustada','Supera stock disponible (' + stock + '). Se ajustó a ' + stock);
+        q = stock;
+      }
       const p = Math.max(0, Math.round(parseFloat(price.value || '0') || 0));
       const tr = document.createElement('tr');
       const idx = body.querySelectorAll('tr').length + 1;
@@ -361,12 +565,12 @@
           </button>
         </td>`;
       body.appendChild(tr);
-      // Enforce max stock on quantity input
+      // Enforce max stock on quantity input (only if stock is a positive finite number)
       var qtyInput = tr.querySelector('input[name="qty[]"]');
-      qtyInput.max = String(stock);
+      qtyInput.max = Number.isFinite(stock) && stock > 0 ? String(stock) : '';
       qtyInput.addEventListener('input', function(){
         let v = parseInt(qtyInput.value || '1', 10);
-        if (v > stock) { v = stock; centerNotify('info','Cantidad ajustada','Stock disponible: ' + stock); }
+        if (Number.isFinite(stock) && stock > 0 && v > stock) { v = stock; centerNotify('info','Cantidad ajustada','Stock disponible: ' + stock); }
         if (v < 1 || isNaN(v)) { v = 1; }
         qtyInput.value = String(v);
         recalc();
@@ -391,18 +595,28 @@
         });
       }
       // Added row; recalc totals
-      // Attach confirm remove with styled modal
+      // Remover inmediatamente sin confirmación para rapidez
       tr.querySelector('.btnRemove').addEventListener('click', function(){
-        confirmModal('Quitar artículo', '¿Deseas quitar "' + name + '" del carrito?', 'Quitar', function(){
-          tr.remove();
-          resequence();
-          recalc();
-          centerNotify('info','Artículo quitado','Se quitó "' + name + '" del carrito.');
-        });
+        try { if (window.loadingBar) window.loadingBar.start('Quitando...'); } catch(_){ }
+        // Remover inmediatamente sin confirmación para rapidez
+        tr.remove();
+        resequence();
+        recalc();
+        centerNotify('info','Artículo quitado','Se quitó "' + name + '" del carrito.');
+        // Si el carrito quedó vacío, limpiar borrador y sincronizar carrito flotante
+        try {
+          if (!body.querySelector('tr')) {
+            clearDraft();
+            if (window.psCart && typeof window.psCart.clear === 'function') { window.psCart.clear(); }
+            else if (window.psCart && typeof window.psCart.refresh === 'function') { window.psCart.refresh(); }
+          }
+        } catch(_){ }
+        try { if (window.loadingBar) window.loadingBar.stop(); } catch(_){ }
       });
       recalc();
       // Notify on add
       centerNotify('success', 'Agregado', 'Se agregó "' + name + '" (x' + q + ') al carrito.');
+      try { if (window.loadingBar) window.loadingBar.stop(); } catch(_){ }
     }
     // addBySkuQuantityPrice solo disponible en Ventas del día
     function resequence(){
@@ -480,83 +694,132 @@
     var btnClear = document.getElementById('btnClearCart');
     if (btnClear) {
       btnClear.addEventListener('click', function(){
-        if (body.querySelector('tr')) { /* proceed */ } else { centerNotify('info','Sin cambios','El carrito ya está vacío'); return; }
-        confirmModal('Vaciar carrito', '¿Deseas quitar todos los artículos del carrito?', 'Vaciar', function(){
+        if (!body.querySelector('tr')) { centerNotify('info','Sin cambios','El carrito ya está vacío'); return; }
+        confirmPretty({ title:'Vaciar carrito', text:'¿Deseas quitar todos los artículos del carrito?', ok:'Vaciar', cancel:'Cancelar', icon:'warning' }).then(function(ok){
+          if (!ok) return;
           body.innerHTML = '';
           resequence();
           recalc();
           centerNotify('success','Carrito vacío','Se vaciaron todos los artículos.');
+          clearDraft();
+          // Sincronizar carrito flotante inmediatamente
+          try {
+            if (window.psCart && typeof window.psCart.clear === 'function') { window.psCart.clear(); }
+            else if (window.psCart && typeof window.psCart.refresh === 'function') { window.psCart.refresh(); }
+          } catch(_){ }
         });
       });
     }
     // Enhance select with Choices.js to show image + name inside dropdown and selection
+    var __choicesInst = null;
     if (sel && window.Choices) {
       try {
-        var choices = new Choices(sel, {
+        // Build explicit choices from existing <option>s, but KEEP ONLY those that have image to avoid duplicates without images
+        var placeholderOpt = null;
+        try { placeholderOpt = sel.querySelector('option[value=""]') || null; } catch(_){ }
+        var all = [];
+        Array.prototype.forEach.call(sel.options, function(o){
+          if (!o) return;
+          if (!o.value) { if (!placeholderOpt) placeholderOpt = o; return; }
+          var img = o.getAttribute('data-image') || '';
+          if (!img) { return; } // skip items without image as requested
+          all.push({
+            value: o.value,
+            label: o.textContent.trim(),
+            disabled: o.disabled,
+            selected: o.selected,
+            customProperties: {
+              image: img,
+              status: o.getAttribute('data-status') || 'ok',
+              sku: o.getAttribute('data-sku') || '',
+              price: o.getAttribute('data-price') || '0',
+              stock: o.getAttribute('data-stock') || '',
+              name: o.getAttribute('data-name') || o.textContent.trim(),
+              description: o.getAttribute('data-description') || ''
+            }
+          });
+        });
+        // Clear current <option>s to prevent duplicates (we will feed Choices with filtered data)
+        try { sel.innerHTML = ''; if (placeholderOpt) sel.appendChild(placeholderOpt); } catch(_){ }
+        __choicesInst = new Choices(sel, {
           searchEnabled: true,
           shouldSort: false,
           itemSelectText: '',
           removeItemButton: false,
           allowHTML: true,
+          choices: all,
           callbackOnCreateTemplates: function(template) {
             return {
-              item: function(classNames, data) {
+              item: function(classNames, d) {
                 var img = '';
-                var status = '';
-                var sku = '';
-                try {
-                  var el = data.customProperties || {};
-                  var imgName = (el && el.image) ? el.image : (data.valueElement && data.valueElement.getAttribute ? data.valueElement.getAttribute('data-image') : '');
-                  status = (el && el.status) ? el.status : (data.valueElement && data.valueElement.getAttribute ? data.valueElement.getAttribute('data-status') : '');
-                  sku = (el && el.sku) ? el.sku : (data.valueElement && data.valueElement.getAttribute ? data.valueElement.getAttribute('data-sku') : '');
-                  if (imgName) img = '<img class="choice__img" src="<?= BASE_URL ?>/uploads/' + imgName + '" alt="">';
-                } catch(_){ }
+                var status = (d.customProperties && d.customProperties.status) || '';
+                var sku = (d.customProperties && d.customProperties.sku) || '';
+                var imgName = (d.customProperties && d.customProperties.image) || '';
+                if (imgName) img = '<img class="choice__img" src="<?= BASE_URL ?>/uploads/' + imgName + '" alt="">';
                 var statusClass = status ? (' stock-' + status) : '';
                 var skuHtml = sku ? ('<span class="choice__sku">' + sku + ' ·</span>') : '';
-                return template('<div class="' + classNames.item + ' ' + (data.highlighted ? classNames.highlightedState : classNames.itemSelectable) + statusClass + '" data-item data-id="' + data.id + '" data-value="' + data.value + '" ' + (data.active ? 'aria-selected="true"' : '') + (data.disabled ? ' aria-disabled="true"' : '') + '><div class="choice__inner">' + img + skuHtml + '<span class="choice__text' + statusClass + '">' + data.label + '</span></div></div>');
+                return template('<div class="' + classNames.item + ' ' + (d.highlighted ? classNames.highlightedState : classNames.itemSelectable) + statusClass + '" data-item data-id="' + d.id + '" data-value="' + d.value + '" ' + (d.active ? 'aria-selected="true"' : '') + (d.disabled ? ' aria-disabled="true"' : '') + '><div class="choice__inner">' + img + skuHtml + '<span class="choice__text' + statusClass + '">' + d.label + '</span></div></div>');
               },
-              choice: function(classNames, data) {
+              choice: function(classNames, d) {
                 var img = '';
-                var status = '';
-                var sku = '';
-                try {
-                  var imgName = data.customProperties && data.customProperties.image ? data.customProperties.image : (data.element ? data.element.getAttribute('data-image') : '');
-                  status = data.customProperties && data.customProperties.status ? data.customProperties.status : (data.element ? data.element.getAttribute('data-status') : '');
-                  sku = data.customProperties && data.customProperties.sku ? data.customProperties.sku : (data.element ? data.element.getAttribute('data-sku') : '');
-                  if (imgName) img = '<img class="choice__img" src="<?= BASE_URL ?>/uploads/' + imgName + '" alt="">';
-                } catch(_){ }
+                var status = (d.customProperties && d.customProperties.status) || '';
+                var sku = (d.customProperties && d.customProperties.sku) || '';
+                var imgName = (d.customProperties && d.customProperties.image) || '';
+                if (imgName) img = '<img class="choice__img" src="<?= BASE_URL ?>/uploads/' + imgName + '" alt="">';
                 var statusClass = status ? (' stock-' + status) : '';
                 var skuHtml = sku ? ('<span class="choice__sku">' + sku + ' ·</span>') : '';
-                return template('<div class="' + classNames.item + ' ' + classNames.itemChoice + ' ' + (data.disabled ? classNames.itemDisabled : classNames.itemSelectable) + '" data-select-text="" data-choice ' + (data.disabled ? 'data-choice-disabled aria-disabled="true"' : 'data-choice-selectable') + ' data-id="' + data.id + '" data-value="' + data.value + '" ' + (data.groupId > 0 ? 'role="treeitem"' : 'role="option"') + '><div class="choice__inner">' + img + skuHtml + '<span class="choice__text' + statusClass + '">' + data.label + '</span></div></div>');
+                return template('<div class="' + classNames.item + ' ' + classNames.itemChoice + ' ' + (d.disabled ? classNames.itemDisabled : classNames.itemSelectable) + '" data-select-text="" data-choice ' + (d.disabled ? 'data-choice-disabled aria-disabled="true"' : 'data-choice-selectable') + ' data-id="' + d.id + '" data-value="' + d.value + '" ' + (d.groupId > 0 ? 'role="treeitem"' : 'role="option"') + '><div class="choice__inner">' + img + skuHtml + '<span class="choice__text' + statusClass + '">' + d.label + '</span></div></div>');
               }
             };
-          },
-          callbackOnInit: function(){
-            // Inject customProperties so templates can access data-image for initial render
-            try {
-              var opts = sel.options;
-              for (var i=0;i<opts.length;i++) {
-                var o = opts[i];
-                if (!o.value) continue;
-                var img = o.getAttribute('data-image') || '';
-                var st = o.getAttribute('data-status') || '';
-                var sku = o.getAttribute('data-sku') || '';
-                var choice = this._store.getChoiceById(i+1) || null; // best-effort
-                if (choice) choice.customProperties = { image: img, status: st, sku: sku };
-              }
-            } catch(_){ }
           }
         });
+        // Ensure our listener still fires
+        sel.addEventListener('change', updatePickerFromSelection);
       } catch(_){ /* ignore */ }
     }
     sel && sel.addEventListener('change', updatePickerFromSelection);
     // Initialize preview & price on page load for current selection
     updatePickerFromSelection();
+    // Watcher: si otro componente (carrito flotante) limpia el borrador en localStorage, reflejarlo aquí sin recargar
+    (function(){
+      var lastDraft = null;
+      try { lastDraft = localStorage.getItem(DRAFT_KEY); } catch(_){ }
+      setInterval(function(){
+        try {
+          var cur = localStorage.getItem(DRAFT_KEY);
+          if (lastDraft && !cur) {
+            // Borrador fue limpiado externamente
+            if (body.querySelector('tr')) {
+              body.innerHTML = '';
+              resequence();
+              recalc();
+              centerNotify('info','Carrito sincronizado','El carrito fue vaciado.');
+            }
+            var db = document.getElementById('draftBanner');
+            if (db) db.style.display = 'none';
+          }
+          lastDraft = cur;
+        } catch(_){ }
+      }, 800);
+    })();
     // Picker qty immediate cap by stock
     if (qty && sel) {
       qty.addEventListener('input', function(){
-        const opt = sel.options[sel.selectedIndex];
-        const ds = opt ? (parseInt(opt.getAttribute('data-stock') || '0', 10) || 0) : 0;
+        // Resolve current stock from option or Choices customProperties
+        let ds = 0;
+        let opt = null; let cp = null;
+        const val = sel.value;
+        if (val) { opt = sel.querySelector('option[value="' + CSS.escape(val) + '"]'); }
+        if (!opt) { opt = sel.options[sel.selectedIndex]; }
+        if (opt) { ds = parseInt(opt.getAttribute('data-stock') || '0', 10) || 0; }
+        try {
+          if ((!opt || !ds) && __choicesInst) {
+            var arr = __choicesInst.getValue();
+            var ch = Array.isArray(arr) ? (arr[0] || null) : (arr || null);
+            cp = ch && ch.customProperties;
+            if (cp && cp.stock !== '') ds = parseInt(cp.stock, 10) || 0;
+          }
+        } catch(_){ }
         let v = Math.max(1, parseInt(qty.value || '1', 10));
         if (ds > 0 && v > ds) { v = ds; centerNotify('warning','Cantidad ajustada','Supera stock disponible ('+ds+').'); }
         qty.value = String(v);
@@ -574,9 +837,82 @@
         try { if (typeof bannerLoading === 'function') bannerLoading(false); } catch(_){}
         centerNotify('warning','Aviso','Agrega al menos un producto');
       }
+      // On submit, clear draft to avoid stale carts after a successful sale
+      clearDraft();
     });
 
     // Initialize submit state on load
     toggleSubmit();
+
+    // Load saved draft first
+    var restored = loadDraft();
+    if (restored > 0) {
+      centerNotify('success','Borrador restaurado','Se restauraron ' + restored + ' producto(s) del borrador.');
+      try {
+        var db = document.getElementById('draftBanner');
+        if (db) { db.classList.remove('d-none'); db.style.display = ''; }
+      } catch(_){ }
+    }
+
+    // Import pending cart from Productos (if any), then save
+    try {
+      var key = 'pharmasoft_pending_cart';
+      var raw = localStorage.getItem(key);
+      if (raw) {
+        var arr = JSON.parse(raw || '[]') || [];
+        if (Array.isArray(arr) && arr.length > 0) {
+          arr.forEach(function(it){ addItemFromData(it || {}); });
+          localStorage.removeItem(key);
+          centerNotify('success','Carrito actualizado','Se importaron ' + arr.length + ' producto(s) desde Productos.');
+          saveDraft();
+          try { if (typeof setDraftBannerCount === 'function') setDraftBannerCount(); } catch(_){ }
+        }
+      }
+    } catch(e) { /* ignore */ }
+
+    // Manual Save Draft button
+    (function(){
+      var sd = document.getElementById('btnSaveDraft');
+      if (!sd) return;
+      sd.addEventListener('click', function(){
+        if (!body.querySelector('tr')) { return centerNotify('info','Sin artículos','Agrega productos antes de guardar borrador.'); }
+        saveDraft();
+        centerNotify('success','Borrador guardado','Tu carrito fue guardado.');
+      });
+    })();
+
+    // Draft banner actions
+    (function(){
+      var db = document.getElementById('draftBanner');
+      var btnC = document.getElementById('btnDraftContinue');
+      var btnD = document.getElementById('btnDraftDiscard');
+      if (!db || !btnC || !btnD) return;
+      btnC.addEventListener('click', function(){ db.style.display = 'none'; notify({ icon:'info', title:'Continuas con el borrador', text:'Puedes seguir editando tu venta.' }); });
+      btnD.addEventListener('click', function(){
+        confirmPretty({ title:'Descartar borrador', text:'¿Deseas descartar el borrador y vaciar el carrito?', ok:'Descartar', cancel:'Cancelar', icon:'warning' }).then(function(ok){
+          if (!ok) return;
+          // Vaciar carrito y borrar draft
+          body.innerHTML = '';
+          resequence();
+          recalc();
+          clearDraft();
+          db.style.display = 'none';
+          centerNotify('success','Borrador descartado','Se descartó el borrador.');
+        });
+      });
+    })();
+
+    // Banner count helpers
+    function getCartCount(){ return body.querySelectorAll('tr').length; }
+    function setDraftBannerCount(){
+      try{
+        var el = document.getElementById('draftCount');
+        if (!el) return;
+        var c = getCartCount();
+        el.textContent = c + (c === 1 ? ' ítem' : ' ítems');
+      }catch(_){ }
+    }
+    // Keep banner count updated
+    setDraftBannerCount();
   })();
 </script>

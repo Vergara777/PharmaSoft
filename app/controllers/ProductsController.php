@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Helpers\Auth;
 use App\Helpers\Security;
 use App\Helpers\Flash;
+use App\Helpers\Audit;
 
 class ProductsController extends Controller {
     public function index(): void {
@@ -20,10 +21,14 @@ class ProductsController extends Controller {
         if ($page > $pages) { $page = $pages; }
         $offset = ($page - 1) * $per;
         $products = $prod->searchPaginated($q, $per, $offset);
+        // Build a quick lookup of products that have sales references to control UI (delete vs deactivate)
+        $ids = array_map(static function($r){ return (int)($r['id'] ?? 0); }, (array)$products);
+        $hasSalesIds = array_flip($prod->idsWithSales($ids));
         $this->view('products/index', [
             'products' => $products,
             'q' => $q,
             'title' => 'Productos',
+            'hasSales' => $hasSalesIds,
             'pagination' => [
                 'page' => $page,
                 'per' => $per,
@@ -98,7 +103,11 @@ class ProductsController extends Controller {
                 $this->redirect('/products/create');
             }
         }
-        (new Product())->create($d);
+        $newId = (new Product())->create($d);
+        // Audit: product created
+        Audit::log('product', (int)$newId, 'create', [
+            'sku' => $d['sku'], 'name' => $d['name'], 'price' => $d['price'], 'stock' => $d['stock'], 'status' => $d['status']
+        ]);
         Flash::success('Producto creado correctamente', 'Éxito');
         $this->redirect('/products');
     }
@@ -171,6 +180,14 @@ class ProductsController extends Controller {
             }
         }
         (new Product())->update((int)$id, $d);
+        // Audit: product updated (only changed fields of interest)
+        $keys = ['sku','name','description','image','stock','price','expires_at','status'];
+        $before = array_intersect_key($existing, array_flip($keys));
+        $after = $d;
+        // Normalize numeric strings
+        foreach (['stock','price'] as $nk) { if (isset($before[$nk])) $before[$nk] = (int)$before[$nk]; }
+        $changes = Audit::diff($before, $after, $keys);
+        if (!empty($changes)) { Audit::log('product', (int)$id, 'update', $changes); }
         Flash::success('Producto actualizado correctamente', 'Éxito');
         $this->redirect('/products');
     }
@@ -291,21 +308,25 @@ class ProductsController extends Controller {
     /**
      * Reactivar un producto retirado
      */
-    public function reactivate(int $id): void {
+    public function reactivate($id): void {
         if (!Auth::check()) { $this->redirect('/auth/login'); }
         if (!Auth::isAdmin()) { Flash::error('No tienes permisos para reactivar productos', 'Acceso denegado'); $this->redirect('/products/retired'); return; }
         if (!Security::verifyCsrf($_POST['csrf'] ?? '')) { http_response_code(400); exit('CSRF'); }
-        try {
-            $ok = (new Product())->reactivate($id);
-            if ($ok) {
-                Flash::success('Producto reactivado correctamente.', 'Éxito');
-            } else {
-                Flash::info('El producto ya estaba activo o no existe.', 'Sin cambios');
-            }
-        } catch (\Throwable $e) {
-            Flash::error('No se pudo reactivar: ' . $e->getMessage(), 'Error');
-        }
+        (new Product())->reactivate((int)$id);
+        Flash::success('Producto reactivado', 'Éxito');
         $this->redirect('/products/retired');
+    }
+
+    /**
+     * Desactivar (retirar) un producto activo
+     */
+    public function retire($id): void {
+        if (!Auth::check()) { $this->redirect('/auth/login'); }
+        if (!Auth::isAdmin()) { Flash::error('No tienes permisos para desactivar productos', 'Acceso denegado'); $this->redirect('/products'); return; }
+        if (!Security::verifyCsrf($_POST['csrf'] ?? '')) { http_response_code(400); exit('CSRF'); }
+        (new Product())->retire((int)$id);
+        Flash::success('Producto desactivado (retirado) correctamente', 'Éxito');
+        $this->redirect('/products');
     }
 }
 

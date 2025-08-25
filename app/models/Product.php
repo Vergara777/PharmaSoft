@@ -191,6 +191,33 @@ class Product extends Model {
         return $stmt->execute([$id]);
     }
 
+    /** Deactivate a product (soft) by marking it as retired and zeroing stock. */
+    public function retire(int $id): bool {
+        $stmt = $this->db->prepare("UPDATE products SET status = 'retired', stock = 0 WHERE id = ? AND status = 'active'");
+        return $stmt->execute([$id]);
+    }
+
+    /** Given product IDs, return an array of IDs that are referenced in sales or sale_items. */
+    public function idsWithSales(array $ids): array {
+        $ids = array_values(array_unique(array_map('intval', array_filter($ids, fn($x) => is_numeric($x)))));
+        if (empty($ids)) return [];
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        // Check both historical schemas: direct sales.product_id and normalized sale_items.product_id
+        $sql = "
+            SELECT DISTINCT product_id FROM sale_items WHERE product_id IN ($placeholders)
+            UNION
+            SELECT DISTINCT product_id FROM sales WHERE product_id IN ($placeholders)
+        ";
+        $stmt = $this->db->prepare($sql);
+        // bind ids twice (for both IN lists)
+        $bind = array_merge($ids, $ids);
+        $stmt->execute($bind);
+        $rows = $stmt->fetchAll();
+        $out = [];
+        foreach ($rows as $r) { $out[(int)($r['product_id'] ?? 0)] = true; }
+        return array_keys($out);
+    }
+
     /** Find an ACTIVE product by exact SKU. Returns row or null. */
     public function findBySkuActive(string $sku): ?array {
         $trim = trim($sku);

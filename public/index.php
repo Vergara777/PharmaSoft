@@ -72,6 +72,8 @@ $router->get('/products/expiring-30', 'ProductsController@expiring30');
 $router->post('/products/retire-expired', 'ProductsController@retireExpired');
 $router->get('/products/retired', 'ProductsController@retired');
 $router->post('/products/reactivate/{id}', 'ProductsController@reactivate');
+// Toggle active->retired
+$router->post('/products/retire/{id}', 'ProductsController@retire');
 
 // Profile
 $router->get('/profile', 'ProfileController@index');
