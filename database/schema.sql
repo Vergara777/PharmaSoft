@@ -1,0 +1,26 @@
+-- PharmaSoft schema
+CREATE DATABASE IF NOT EXISTS pharmasoft CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE pharmasoft;
+
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  email VARCHAR(150) NOT NULL UNIQUE,
+  role ENUM('admin','tech') NOT NULL DEFAULT 'tech',
+  password_hash VARCHAR(255) NOT NULL,
+  avatar VARCHAR(255) NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS products (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sku VARCHAR(64) NOT NULL UNIQUE,
+  name VARCHAR(200) NOT NULL,
+  description TEXT NULL,
+  stock INT NOT NULL DEFAULT 0,
+  expires_at DATE NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX (name),
+  INDEX (sku),
+  INDEX (expires_at)
+) ENGINE=InnoDB;
