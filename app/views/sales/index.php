@@ -13,13 +13,30 @@
           <div class="input-group-append"><button class="btn btn-outline-secondary"><i class="fas fa-search mr-1" aria-hidden="true"></i> Buscar</button></div>
         </div>
       </form>
+      <form class="form-inline mr-2" method="get" action="<?= BASE_URL ?>/sales">
+        <div class="input-group input-group-sm mr-1">
+          <div class="input-group-prepend"><span class="input-group-text">Desde</span></div>
+          <input type="date" class="form-control" name="from" value="<?= View::e($from ?? '') ?>">
+        </div>
+        <div class="input-group input-group-sm mr-1">
+          <div class="input-group-prepend"><span class="input-group-text">Hasta</span></div>
+          <input type="date" class="form-control" name="to" value="<?= View::e($to ?? '') ?>">
+        </div>
+        <button class="btn btn-outline-secondary btn-sm"><i class="fas fa-filter mr-1" aria-hidden="true"></i> Filtrar</button>
+      </form>
+      <div class="mr-2">
+        <a href="<?= BASE_URL ?>/sales/template" id="btnDownloadSalesExcelTemplate" class="btn btn-link btn-sm">Plantilla Excel</a>
+        <a href="<?= BASE_URL ?>/sales/export?from=<?= urlencode($from ?? '') ?>&to=<?= urlencode($to ?? '') ?>" class="btn btn-success btn-sm ml-1">
+          <i class="fas fa-file-excel mr-1" aria-hidden="true"></i> Exportar Excel
+        </a>
+      </div>
       <a href="<?= BASE_URL ?>/sales/all" class="btn btn-link btn-sm mr-2"><i class="fas fa-list mr-1" aria-hidden="true"></i> Ventas (todas)</a>
       <a href="<?= BASE_URL ?>/sales/create" class="btn btn-primary btn-sm"><i class="fas fa-plus mr-1" aria-hidden="true"></i> Nueva venta</a>
     </div>
   </div>
   <div class="table-responsive">
     <table class="table table-striped mb-0">
-      <thead><tr><th>ID</th><th>SKU</th><th>Producto</th><th>Cant.</th><th>P. Unit</th><th>Total</th><th>Cliente</th><th>Teléfono</th><th>Atendido por</th><th>Fecha</th><th>Acciones</th></tr></thead>
+      <thead><tr><th>ID</th><th>SKU</th><th>Producto</th><th>Cant.</th><th>P. Unit</th><th>Total</th><th>Cliente</th><th>Contacto</th><th>Atendido por</th><th>Fecha</th><th>Acciones</th></tr></thead>
       <tbody>
         <?php foreach ($sales as $s): ?>
           <?php 
@@ -34,9 +51,9 @@
             if ($isCart) {
               $q = (float)($s['items_qty'] ?? 0);
               $t = (float)($s['total'] ?? 0);
-              if ($q > 0) { $punit = $t / $q; }
+              if ($q > 0) { $punit = round($t / $q); }
             } else {
-              if (isset($s['unit_price'])) { $punit = (float)$s['unit_price']; }
+              if (isset($s['unit_price'])) { $punit = (int)$s['unit_price']; }
             }
             $attended = trim(($s['user_name'] ?? '') . ' ' . (($s['user_role'] ?? '') ? '(' . $s['user_role'] . ')' : ''));
           ?>
@@ -45,10 +62,15 @@
             <td><?= View::e($sku) ?></td>
             <td><?= View::e($name) ?></td>
             <td><?= View::e($qty) ?></td>
-            <td><?= ($punit !== null) ? ('$' . number_format($punit, 2)) : '-' ?></td>
-            <td>$<?= number_format((float)($s['total'] ?? 0), 2) ?></td>
+            <td><?= ($punit !== null) ? ('$' . number_format((float)$punit, 0, ',', '.')) : '-' ?></td>
+            <td>$<?= number_format((float)($s['total'] ?? 0), 0, ',', '.') ?></td>
             <td><?= View::e($s['customer_name'] ?? '') ?></td>
-            <td><?= View::e($s['customer_phone'] ?? '') ?></td>
+            <td>
+              <?= View::e($s['customer_phone'] ?? '') ?>
+              <?php if (!empty($s['customer_email'])): ?>
+                <br><small class="text-muted"><?= View::e($s['customer_email']) ?></small>
+              <?php endif; ?>
+            </td>
             <td><?= View::e($attended) ?></td>
             <td><?= View::e($s['created_at']) ?></td>
             <td>
@@ -65,6 +87,10 @@
     </table>
   </div>
 </div>
+
+<script>
+  (function(){ /* Import button removed by request */ })();
+</script>
 
 <?php if (!empty($pagination) && is_array($pagination)): ?>
   <?php

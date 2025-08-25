@@ -16,6 +16,8 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' https://c
 // Paths
 define('BASE_PATH', dirname(__DIR__));
 define('APP_PATH', BASE_PATH . DIRECTORY_SEPARATOR . 'app');
+// Composer autoload (vendor libraries)
+if (is_file(BASE_PATH . '/vendor/autoload.php')) { require BASE_PATH . '/vendor/autoload.php'; }
 
 require APP_PATH . '/config/config.php';
 require APP_PATH . '/config/database.php';
@@ -82,5 +84,7 @@ $router->get('/sales/all', 'SalesController@all');
 $router->get('/sales/create', 'SalesController@create');
 $router->post('/sales/store', 'SalesController@store');
 $router->get('/sales/invoice/{id}', 'SalesController@invoice');
+$router->get('/sales/export', 'SalesController@export');
+$router->get('/sales/template', 'SalesController@template');
 
 $router->dispatch();

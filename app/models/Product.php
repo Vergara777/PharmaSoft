@@ -7,7 +7,7 @@ use PDO;
 class Product extends Model {
     public function all(): array {
         // Include stock so sales create view can validate availability correctly
-        return $this->db->query("SELECT id, sku, name, image, stock, price, expires_at FROM products WHERE status = 'active' ORDER BY name ASC")->fetchAll();
+        return $this->db->query("SELECT id, sku, name, description, image, stock, price, expires_at, status FROM products WHERE status = 'active' ORDER BY name ASC")->fetchAll();
     }
     public function search(string $q = ''): array {
         if ($q === '') {
@@ -190,7 +190,14 @@ class Product extends Model {
         $stmt = $this->db->prepare("UPDATE products SET status = 'active' WHERE id = ? AND status = 'retired'");
         return $stmt->execute([$id]);
     }
+
+    /** Find an ACTIVE product by exact SKU. Returns row or null. */
+    public function findBySkuActive(string $sku): ?array {
+        $trim = trim($sku);
+        if ($trim === '') return null;
+        $stmt = $this->db->prepare("SELECT * FROM products WHERE status = 'active' AND sku = ? LIMIT 1");
+        $stmt->execute([$trim]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
 }
-
-
-

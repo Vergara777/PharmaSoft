@@ -7,6 +7,9 @@ use App\Helpers\Security;
 use App\Models\Sale;
 use App\Models\Product;
 use App\Helpers\Flash;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class SalesController extends Controller {
     public function index(): void {
@@ -21,15 +24,27 @@ class SalesController extends Controller {
         $per = isset($_GET['per']) && ctype_digit((string)$_GET['per']) && (int)$_GET['per'] > 0 ? min((int)$_GET['per'], 100) : 9;
         if ($per < 9) { $per = 9; }
         $sale = new Sale();
-        $total = $sale->countToday();
+        // Date filter
+        $from = trim((string)($_GET['from'] ?? ''));
+        $to = trim((string)($_GET['to'] ?? ''));
+        $isYmd = function(string $d){ return (bool)preg_match('/^\d{4}-\d{2}-\d{2}$/', $d); };
+        $useDateFilter = $isYmd($from) && $isYmd($to);
+        if (!$useDateFilter) {
+            $from = (new \DateTimeImmutable('today'))->format('Y-m-d');
+            $to = $from;
+            $useDateFilter = true;
+        }
+        $total = $sale->countByDate($from, $to);
         $pages = max(1, (int)ceil($total / $per));
         if ($page > $pages) { $page = $pages; }
         $offset = ($page - 1) * $per;
-        $sales = $sale->todayPaginated($per, $offset);
+        $sales = $sale->byDatePaginated($from, $to, $per, $offset);
         $this->view('sales/index', [
             'sales' => $sales,
             'filterId' => $filterId,
             'title' => 'Ventas del día',
+            'from' => $from,
+            'to' => $to,
             'pagination' => [
                 'page' => $page,
                 'per' => $per,
@@ -50,6 +65,7 @@ class SalesController extends Controller {
         if (!Security::verifyCsrf($_POST['csrf'] ?? '')) { http_response_code(400); exit('CSRF'); }
         $customerName = trim((string)($_POST['customer_name'] ?? '')) ?: null;
         $customerPhone = trim((string)($_POST['customer_phone'] ?? '')) ?: null;
+        $customerEmail = trim((string)($_POST['customer_email'] ?? '')) ?: null;
         $productIds = $_POST['product_id'] ?? null; // can be scalar or array
         $qtys = $_POST['qty'] ?? null;
         $prices = $_POST['unit_price'] ?? null;
@@ -62,7 +78,7 @@ class SalesController extends Controller {
                 for ($i = 0; $i < $n; $i++) {
                     $pid = (int)$productIds[$i];
                     $q = (int)$qtys[$i];
-                    $pr = (float)$prices[$i];
+                    $pr = (int)$prices[$i];
                     if ($pid > 0 && $q > 0) {
                         $items[] = ['product_id' => $pid, 'qty' => $q, 'unit_price' => $pr];
                     }
@@ -70,16 +86,16 @@ class SalesController extends Controller {
                 if (empty($items)) {
                     throw new \RuntimeException('El carrito está vacío. Agrega al menos un producto.');
                 }
-                $saleId = (new Sale())->createCart($items, $customerName, $customerPhone);
+                $saleId = (new Sale())->createCart($items, $customerName, $customerPhone, $customerEmail);
             } else {
                 // Legacy single-item form
                 $productId = (int)$productIds;
                 $qty = (int)$qtys;
-                $unitPrice = (float)$prices;
+                $unitPrice = (int)$prices;
                 if ($productId <= 0 || $qty <= 0) {
                     throw new \RuntimeException('Selecciona un producto y una cantidad válida.');
                 }
-                $saleId = (new Sale())->create($productId, $qty, $unitPrice, $customerName, $customerPhone);
+                $saleId = (new Sale())->create($productId, $qty, $unitPrice, $customerName, $customerPhone, $customerEmail);
             }
             // Flash success notification
             Flash::success('Venta registrada exitosamente', 'Venta exitosa');
@@ -130,5 +146,88 @@ class SalesController extends Controller {
                 'pages' => $pages,
             ]
         ]);
+    }
+
+    /** Importar ventas desde CSV. Cada fila es una venta independiente.
+     * Columnas soportadas (con o sin encabezado):
+     *  customer_name, customer_phone, customer_email, sku, qty, unit_price
+     * Retorna JSON con cantidad creada y errores por fila.
+     */
+    // Import endpoint removed. Kept as stub to avoid hard errors if called directly.
+    public function import(): void {
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(404);
+        echo json_encode(['success'=>false,'message'=>'Importación deshabilitada']);
+    }
+
+    /** Descargar Excel con ventas del rango from/to actual. */
+    public function export(): void {
+        if (!Auth::check()) { $this->redirect('/auth/login'); }
+        $from = trim((string)($_GET['from'] ?? ''));
+        $to = trim((string)($_GET['to'] ?? ''));
+        $isYmd = function(string $d){ return (bool)preg_match('/^\d{4}-\d{2}-\d{2}$/', $d); };
+        if (!$isYmd($from) || !$isYmd($to)) {
+            $from = (new \DateTimeImmutable('today'))->format('Y-m-d');
+            $to = $from;
+        }
+        $sale = new Sale();
+        $rows = $sale->byDatePaginated($from, $to, 100000, 0);
+
+        $ss = new Spreadsheet();
+        $sh = $ss->getActiveSheet();
+        $sh->setTitle('Ventas');
+        // Header (now includes Email)
+        $headers = ['ID','SKU','Producto','Cant.','P. Unit','Total','Cliente','Teléfono','Email','Atendido por','Fecha'];
+        $sh->fromArray($headers, null, 'A1');
+        $r = 2;
+        foreach ($rows as $s) {
+            $isCart = !empty($s['item_count']) && (int)$s['item_count'] > 0 && empty($s['product_id']);
+            $sku = $isCart ? ($s['first_sku'] ?? '') : ($s['sku'] ?? '');
+            $name = $isCart ? ($s['first_name'] ?? '') : ($s['name'] ?? '');
+            if ($isCart && (int)$s['item_count'] > 1) {
+                $name = trim($name . ' +' . ((int)$s['item_count'] - 1) . ' más');
+            }
+            $qty = $isCart ? (int)($s['items_qty'] ?? 0) : (int)($s['qty'] ?? 0);
+            $punit = null;
+            if ($isCart) {
+                $q = (float)($s['items_qty'] ?? 0); $t = (float)($s['total'] ?? 0); if ($q > 0) { $punit = round($t / $q); }
+            } else {
+                if (isset($s['unit_price'])) { $punit = (int)$s['unit_price']; }
+            }
+            $attended = trim(($s['user_name'] ?? '') . ' ' . (($s['user_role'] ?? '') ? '(' . $s['user_role'] . ')' : ''));
+            $row = [
+                $s['id'] ?? '', $sku, $name, $qty, $punit, $s['total'] ?? 0, $s['customer_name'] ?? '', $s['customer_phone'] ?? '', $s['customer_email'] ?? '', $attended, $s['created_at'] ?? ''
+            ];
+            $sh->fromArray($row, null, 'A' . $r);
+            $r++;
+        }
+        // Autosize
+        foreach (range('A','K') as $col) { $sh->getColumnDimension($col)->setAutoSize(true); }
+
+        $filename = 'ventas_' . $from . '_a_' . $to . '.xlsx';
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        $writer = new Xlsx($ss);
+        $writer->save('php://output');
+        exit;
+    }
+
+    /** Descargar plantilla Excel para importar ventas (una por fila). */
+    public function template(): void {
+        if (!Auth::check()) { $this->redirect('/auth/login'); }
+        $ss = new Spreadsheet();
+        $sh = $ss->getActiveSheet();
+        $sh->setTitle('Plantilla import');
+        $sh->fromArray(['customer_name','customer_phone','customer_email','sku','qty','unit_price'], null, 'A1');
+        $sh->fromArray(['Juan Perez','3000000000','juan@example.com','ABC123',2,15000], null, 'A2');
+        $sh->fromArray(['Ana Gomez','3011111111','', 'LMN456',3,12000], null, 'A3');
+        foreach (range('A','F') as $col) { $sh->getColumnDimension($col)->setAutoSize(true); }
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="plantilla_import_ventas.xlsx"');
+        header('Cache-Control: max-age=0');
+        $writer = new Xlsx($ss);
+        $writer->save('php://output');
+        exit;
     }
 }

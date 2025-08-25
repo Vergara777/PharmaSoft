@@ -7,10 +7,15 @@
   <title><?= View::e($title ?? ('Factura electrónica #' . ($sale['id'] ?? ''))) ?></title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
   <style>
-    body { background: #f5f6f7; }
-    .invoice-box { max-width: 900px; margin: 30px auto; background: #fff; padding: 30px; border: 1px solid #eee; }
+    body { background: #f5f6f7; font-size: 14px; }
+    .invoice-box { max-width: 960px; margin: 24px auto; background: #fff; padding: 28px; border: 1px solid #e9ecef; border-radius: 8px; }
     .title { font-size: 22px; font-weight: 700; }
-    .meta { color: #666; }
+    .meta { color: #666; font-size: 13px; }
+    .brand { font-weight: 800; font-size: 18px; }
+    .muted { color: #6c757d; }
+    .hr { height:1px; background:#e9ecef; margin: 14px 0; }
+    table.table-sm th, table.table-sm td { padding-top: .5rem; padding-bottom: .5rem; }
+    .totals-row th, .totals-row td { border-top: 2px solid #dee2e6; font-weight: 700; }
     /* Print improvements */
     @page { size: A4; margin: 12mm; }
     @media print {
@@ -22,24 +27,27 @@
 </head>
 <body>
   <div class="invoice-box">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex justify-content-between align-items-start mb-2">
       <div>
         <div class="title"><i class="fas fa-file-invoice mr-2 text-primary" aria-hidden="true"></i> Factura electrónica</div>
-        <div class="meta">#<?= View::e($sale['id']) ?> · <?= View::e($sale['created_at'] ?? '') ?></div>
+        <div class="meta">Folio #<?= View::e($sale['id']) ?> · <?= View::e($sale['created_at'] ?? '') ?></div>
       </div>
       <div class="text-right">
-        <div><strong>PharmaSoft</strong></div>
+        <div class="brand">PharmaSoft</div>
         <div class="meta">Sistema de Ventas</div>
       </div>
     </div>
 
-    <hr>
+    <div class="hr"></div>
 
     <div class="row">
       <div class="col-md-6">
         <h6>Cliente</h6>
         <div><strong><?= View::e($sale['customer_name'] ?? 'Consumidor final') ?></strong></div>
-        <div><?= View::e($sale['customer_phone'] ?? '') ?></div>
+        <div class="meta">Tel: <?= View::e($sale['customer_phone'] ?? '') ?></div>
+        <?php if (!empty($sale['customer_email'] ?? '')): ?>
+          <div class="meta">Email: <?= View::e($sale['customer_email']) ?></div>
+        <?php endif; ?>
       </div>
       <div class="col-md-6 text-md-right">
         <h6>Detalles</h6>
@@ -68,26 +76,30 @@
             <?php foreach ($sale['items'] as $it): ?>
               <tr>
                 <td><?= View::e($it['sku'] ?? '') ?></td>
-                <td><?= View::e($it['name'] ?? '') ?></td>
+                <td>
+                  <span><?= View::e($it['name'] ?? '') ?></span>
+                </td>
                 <td class="text-right"><?= View::e($it['qty'] ?? 0) ?></td>
-                <td class="text-right">$<?= number_format((float)($it['unit_price'] ?? 0), 2) ?></td>
-                <td class="text-right">$<?= number_format((float)($it['line_total'] ?? 0), 2) ?></td>
+                <td class="text-right">$<?= number_format((float)($it['unit_price'] ?? 0), 0, ',', '.') ?></td>
+                <td class="text-right">$<?= number_format((float)($it['line_total'] ?? 0), 0, ',', '.') ?></td>
               </tr>
             <?php endforeach; ?>
           <?php else: ?>
               <tr>
                 <td><?= View::e($sale['sku'] ?? '') ?></td>
-                <td><?= View::e($sale['name'] ?? '') ?></td>
+                <td>
+                  <span><?= View::e($sale['name'] ?? '') ?></span>
+                </td>
                 <td class="text-right"><?= View::e($sale['qty'] ?? 0) ?></td>
-                <td class="text-right">$<?= number_format((float)($sale['unit_price'] ?? 0), 2) ?></td>
-                <td class="text-right">$<?= number_format((float)($sale['total'] ?? 0), 2) ?></td>
+                <td class="text-right">$<?= number_format((float)($sale['unit_price'] ?? 0), 0, ',', '.') ?></td>
+                <td class="text-right">$<?= number_format((float)($sale['total'] ?? 0), 0, ',', '.') ?></td>
               </tr>
           <?php endif; ?>
         </tbody>
         <tfoot>
-          <tr>
+          <tr class="totals-row">
             <th colspan="4" class="text-right">Total</th>
-            <th class="text-right">$<?= number_format((float)($sale['total'] ?? 0), 2) ?></th>
+            <th class="text-right">$<?= number_format((float)($sale['total'] ?? 0), 0, ',', '.') ?></th>
           </tr>
         </tfoot>
       </table>

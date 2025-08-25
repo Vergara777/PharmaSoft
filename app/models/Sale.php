@@ -17,6 +17,7 @@ class Sale extends Model {
                     s.total,
                     s.customer_name,
                     s.customer_phone,
+                    s.customer_email,
                     s.user_name,
                     s.user_role,
                     s.created_at,
@@ -28,6 +29,52 @@ class Sale extends Model {
                 LEFT JOIN products p ON p.id = s.product_id
                 ORDER BY s.id ASC';
         return $this->db->query($sql)->fetchAll();
+    }
+
+    /** Count sales between dates inclusive (Y-m-d). */
+    public function countByDate(string $from, string $to): int {
+        $sql = 'SELECT COUNT(*) FROM sales s WHERE DATE(s.created_at) BETWEEN :f AND :t';
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':f', $from);
+        $stmt->bindValue(':t', $to);
+        $stmt->execute();
+        return (int)$stmt->fetchColumn();
+    }
+
+    /** Paginated list of sales between dates inclusive, ordered ASC by id. */
+    public function byDatePaginated(string $from, string $to, int $limit, int $offset): array {
+        if ($limit < 9) { $limit = 9; }
+        if ($offset < 0) { $offset = 0; }
+        $sql = 'SELECT 
+                    s.id,
+                    s.product_id,
+                    p.sku,
+                    p.name,
+                    s.qty,
+                    s.unit_price,
+                    s.total,
+                    s.customer_name,
+                    s.customer_phone,
+                    s.customer_email,
+                    s.user_name,
+                    s.user_role,
+                    s.created_at,
+                    (SELECT COUNT(*) FROM sale_items si WHERE si.sale_id = s.id) AS item_count,
+                    (SELECT COALESCE(SUM(si.qty),0) FROM sale_items si WHERE si.sale_id = s.id) AS items_qty,
+                    (SELECT p2.sku FROM sale_items si2 JOIN products p2 ON p2.id = si2.product_id WHERE si2.sale_id = s.id ORDER BY si2.id ASC LIMIT 1) AS first_sku,
+                    (SELECT p2.name FROM sale_items si3 JOIN products p2 ON p2.id = si3.product_id WHERE si3.sale_id = s.id ORDER BY si3.id ASC LIMIT 1) AS first_name
+                FROM sales s 
+                LEFT JOIN products p ON p.id = s.product_id
+                WHERE DATE(s.created_at) BETWEEN :f AND :t
+                ORDER BY s.id ASC
+                LIMIT :lim OFFSET :off';
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':f', $from);
+        $stmt->bindValue(':t', $to);
+        $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':off', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
     }
 
     /** Count today's sales (date filter). */
@@ -50,6 +97,7 @@ class Sale extends Model {
                     s.total,
                     s.customer_name,
                     s.customer_phone,
+                    s.customer_email,
                     s.user_name,
                     s.user_role,
                     s.created_at,
@@ -89,6 +137,7 @@ class Sale extends Model {
                     s.total,
                     s.customer_name,
                     s.customer_phone,
+                    s.customer_email,
                     s.user_name,
                     s.user_role,
                     s.created_at,
@@ -119,6 +168,7 @@ class Sale extends Model {
                     s.total,
                     s.customer_name,
                     s.customer_phone,
+                    s.customer_email,
                     s.user_name,
                     s.user_role,
                     s.created_at,
@@ -144,6 +194,7 @@ class Sale extends Model {
                     s.total,
                     s.customer_name,
                     s.customer_phone,
+                    s.customer_email,
                     s.user_name,
                     s.user_role,
                     s.created_at,
@@ -171,6 +222,7 @@ class Sale extends Model {
                     s.total,
                     s.customer_name,
                     s.customer_phone,
+                    s.customer_email,
                     s.user_name,
                     s.user_role,
                     s.created_at,
@@ -196,6 +248,7 @@ class Sale extends Model {
                     s.total,
                     s.customer_name,
                     s.customer_phone,
+                    s.customer_email,
                     s.user_name,
                     s.user_role,
                     s.created_at,
@@ -212,7 +265,7 @@ class Sale extends Model {
         return $stmt->fetchAll();
     }
 
-    public function create(int $productId, int $qty, float $unitPrice, ?string $customerName = null, ?string $customerPhone = null): int {
+    public function create(int $productId, int $qty, float $unitPrice, ?string $customerName = null, ?string $customerPhone = null, ?string $customerEmail = null): int {
         $this->db->beginTransaction();
         try {
             // Check stock
@@ -242,8 +295,8 @@ class Sale extends Model {
 
             // Insert sale
             $total = $qty * $unitPrice;
-            $ins = $this->db->prepare('INSERT INTO sales (product_id, qty, unit_price, total, customer_name, customer_phone, user_id, user_role, user_name) VALUES (?,?,?,?,?,?,?,?,?)');
-            $ins->execute([$productId, $qty, $unitPrice, $total, $customerName, $customerPhone, $uid, $urole, $uname]);
+            $ins = $this->db->prepare('INSERT INTO sales (product_id, qty, unit_price, total, customer_name, customer_phone, customer_email, user_id, user_role, user_name) VALUES (?,?,?,?,?,?,?,?,?,?)');
+            $ins->execute([$productId, $qty, $unitPrice, $total, $customerName, $customerPhone, $customerEmail, $uid, $urole, $uname]);
             $saleId = (int)$this->db->lastInsertId();
             
             // Decrement stock
@@ -263,7 +316,7 @@ class Sale extends Model {
      */
     public function findByIdWithItems(int $id): ?array {
         // Header
-        $h = $this->db->prepare('SELECT id, customer_name, customer_phone, total, created_at, user_name, user_role FROM sales WHERE id = ?');
+        $h = $this->db->prepare('SELECT id, customer_name, customer_phone, customer_email, total, created_at, user_name, user_role FROM sales WHERE id = ?');
         $h->execute([$id]);
         $sale = $h->fetch(PDO::FETCH_ASSOC);
         if (!$sale) return null;
@@ -287,7 +340,7 @@ class Sale extends Model {
         return $sale;
     }
 
-    public function createCart(array $items, ?string $customerName = null, ?string $customerPhone = null): int {
+    public function createCart(array $items, ?string $customerName = null, ?string $customerPhone = null, ?string $customerEmail = null): int {
         if (empty($items)) { throw new \InvalidArgumentException('El carrito está vacío'); }
         // Normalize and validate
         $norm = [];
@@ -307,8 +360,8 @@ class Sale extends Model {
             $urole = $u['role'] ?? null;
             $uname = $u['name'] ?? null;
             // Insert header first with total 0
-            $insSale = $this->db->prepare('INSERT INTO sales (product_id, qty, unit_price, total, customer_name, customer_phone, user_id, user_role, user_name) VALUES (NULL, NULL, NULL, 0, ?, ?, ?, ?, ?)');
-            $insSale->execute([$customerName, $customerPhone, $uid, $urole, $uname]);
+            $insSale = $this->db->prepare('INSERT INTO sales (product_id, qty, unit_price, total, customer_name, customer_phone, customer_email, user_id, user_role, user_name) VALUES (NULL, NULL, NULL, 0, ?, ?, ?, ?, ?, ?)');
+            $insSale->execute([$customerName, $customerPhone, $customerEmail, $uid, $urole, $uname]);
             $saleId = (int)$this->db->lastInsertId();
 
             $total = 0.0;

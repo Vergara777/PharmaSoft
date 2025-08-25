@@ -51,7 +51,7 @@ class ProductsController extends Controller {
             'description' => trim($_POST['description'] ?? ''),
             'image' => null,
             'stock' => (int)($_POST['stock'] ?? 0),
-            'price' => (float)($_POST['price'] ?? 0),
+            'price' => (int)($_POST['price'] ?? 0),
             'expires_at' => $_POST['expires_at'] ?? null,
             'status' => $status,
         ];
@@ -123,7 +123,7 @@ class ProductsController extends Controller {
             'description' => trim($_POST['description'] ?? ''),
             'image' => $existing['image'] ?? null,
             'stock' => (int)($_POST['stock'] ?? 0),
-            'price' => (float)($_POST['price'] ?? 0),
+            'price' => (int)($_POST['price'] ?? 0),
             'expires_at' => $_POST['expires_at'] ?? null,
             'status' => $status,
         ];

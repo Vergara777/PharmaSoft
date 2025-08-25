@@ -34,9 +34,9 @@
             if ($isCart) {
               $q = (float)($s['items_qty'] ?? 0);
               $t = (float)($s['total'] ?? 0);
-              if ($q > 0) { $punit = $t / $q; }
+              if ($q > 0) { $punit = round($t / $q); }
             } else {
-              if (isset($s['unit_price'])) { $punit = (float)$s['unit_price']; }
+              if (isset($s['unit_price'])) { $punit = (int)$s['unit_price']; }
             }
             $attended = trim(($s['user_name'] ?? '') . ' ' . (($s['user_role'] ?? '') ? '(' . $s['user_role'] . ')' : ''));
           ?>
@@ -45,8 +45,8 @@
             <td><?= View::e($sku) ?></td>
             <td><?= View::e($name) ?></td>
             <td><?= View::e($qty) ?></td>
-            <td><?= ($punit !== null) ? ('$' . number_format($punit, 2)) : '-' ?></td>
-            <td>$<?= number_format((float)($s['total'] ?? 0), 2) ?></td>
+            <td><?= ($punit !== null) ? ('$' . number_format((float)$punit, 0, ',', '.')) : '-' ?></td>
+            <td>$<?= number_format((float)($s['total'] ?? 0), 0, ',', '.') ?></td>
             <td><?= View::e($s['customer_name'] ?? '') ?></td>
             <td><?= View::e($s['customer_phone'] ?? '') ?></td>
             <td><?= View::e($attended) ?></td>

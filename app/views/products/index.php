@@ -1,5 +1,15 @@
 <?php use App\Core\View; use App\Helpers\Security; ?>
-<div class="card">
+<div class="card products-card">
+  <style>
+    /* Scoped to products list only */
+    .products-card .badge { font-weight: 600; letter-spacing: .2px; }
+    .products-card td .badge { font-size: .9rem; padding: .45em .6em; }
+    /* Vivid colors + subtle glow */
+    .products-card .badge-danger { background: #ff1744; color: #fff; box-shadow: 0 0 6px rgba(255, 23, 68, .55); }
+    .products-card .badge-warning { background: #ffb300; color: #111; box-shadow: 0 0 6px rgba(255, 179, 0, .55); }
+    .products-card .badge-success { background: #00c853; color: #fff; box-shadow: 0 0 6px rgba(0, 200, 83, .45); }
+    .products-card .badge-secondary { background: #5a6268; color: #fff; box-shadow: 0 0 6px rgba(90, 98, 104, .45); }
+  </style>
   <div class="card-header">
     <?php $isAdmin = \App\Helpers\Auth::isAdmin(); $isRetired = !empty($retired); ?>
     <form class="form-inline" method="get" action="<?= BASE_URL ?><?= $isRetired ? '/products/retired' : '/products' ?>">
@@ -90,7 +100,7 @@
               <?php endif; ?>
               <span><?= View::e($p['name']) ?></span>
             </td>
-            <td>$<?= number_format((float)($p['price'] ?? 0), 2) ?></td>
+            <td>$<?= number_format((float)($p['price'] ?? 0), 0, ',', '.') ?></td>
             <td>
               <span class="badge badge-<?= $badgeClass ?>" title="<?= !empty($p['expires_at']) ? ('Vence: ' . View::e($p['expires_at'])) : '' ?>"><?= $badgeIconHtml ?><span><?= View::e($stock) ?></span></span>
             </td>
@@ -119,7 +129,8 @@
                       data-stock="<?= View::e($p['stock'] ?? 0) ?>"
                       data-price="<?= number_format((float)($p['price'] ?? 0), 2, '.', '') ?>"
                       data-expires_at="<?= View::e($p['expires_at'] ?? '') ?>"
-                      data-status="<?= View::e($p['status'] ?? '') ?>">
+                      data-status="<?= View::e($p['status'] ?? '') ?>"
+                      data-image="<?= View::e($p['image'] ?? '') ?>">
                 <i class="fas fa-eye mr-1" aria-hidden="true"></i> Ver
               </button>
               <?php if ($isAdmin): ?>
@@ -181,28 +192,28 @@
               <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
             <div class="modal-body">
-              <div class="row">
-                <div class="col-md-6">
-                  <dl class="row mb-2">
-                    <dt class="col-sm-4">ID</dt><dd class="col-sm-8" id="pd-id">—</dd>
-                    <dt class="col-sm-4">SKU</dt><dd class="col-sm-8" id="pd-sku">—</dd>
-                    <dt class="col-sm-4">Nombre</dt><dd class="col-sm-8" id="pd-name">—</dd>
-                  </dl>
+              <div class="d-flex align-items-start" style="gap:14px;">
+                <div>
+                  <h6 class="font-weight-bold mb-1">Producto</h6>
+                  <img id="pd-img" src="" alt="Imagen del producto" style="width: 140px; height: 140px; object-fit: cover; border: 1px solid #eee; border-radius: 6px; display: none;">
                 </div>
-                <div class="col-md-6">
-                  <dl class="row mb-2">
-                    <dt class="col-sm-4">Precio</dt><dd class="col-sm-8" id="pd-price">—</dd>
-                    <dt class="col-sm-4">Stock</dt><dd class="col-sm-8" id="pd-stock">—</dd>
-                    <dt class="col-sm-4">Caducidad</dt><dd class="col-sm-8" id="pd-exp">—</dd>
-                    <dt class="col-sm-4">Estado</dt><dd class="col-sm-8" id="pd-status">—</dd>
-                  </dl>
+                <div class="flex-grow-1">
+                  <div class="d-flex flex-wrap">
+                    <div class="mr-3 mb-2"><strong>SKU:</strong> <span id="pd-sku">—</span></div>
+                    <div class="mr-3 mb-2"><strong>Producto:</strong> <span id="pd-name">—</span></div>
+                  </div>
+                  <div class="d-flex flex-wrap small text-muted mb-2">
+                    <div class="mr-3"><strong>Precio:</strong> <span id="pd-price">—</span></div>
+                    <div class="mr-3"><strong>Stock:</strong> <span id="pd-stock">—</span></div>
+                    <div class="mr-3"><strong>Caducidad:</strong> <span id="pd-exp">—</span></div>
+                    <div class="mr-3"><strong>Estado:</strong> <span id="pd-status">—</span></div>
+                  </div>
+                  <div>
+                    <h6 class="font-weight-bold mb-1">Descripción</h6>
+                    <div id="pd-desc">—</div>
+                  </div>
                 </div>
               </div>
-              <div class="mt-2">
-                <h6 class="font-weight-bold">Descripción</h6>
-                <div id="pd-desc">—</div>
-              </div>
-              
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
@@ -215,7 +226,14 @@
     // Crear al cargar
     createDetailModal();
 
-    function fmtCurrency(n){ try{ return new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(parseFloat(n||0)); }catch(e){ return '$' + (parseFloat(n||0)).toFixed(2); } }
+    function fmtCurrency(n){
+      try{
+        return new Intl.NumberFormat('es-CO', { style:'currency', currency:'COP', minimumFractionDigits:0, maximumFractionDigits:0 }).format(parseFloat(n||0));
+      }catch(e){
+        var v = Math.round(parseFloat(n||0));
+        return '$' + v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      }
+    }
     function decodeHtmlEntities(str){
       try { var ta = document.createElement('textarea'); ta.innerHTML = str; return ta.value; } catch(e){ return str; }
     }
@@ -263,17 +281,31 @@
         }
         return;
       }
-      m.querySelector('#pd-id').textContent = btn.getAttribute('data-id') || '—';
-      m.querySelector('#pd-sku').textContent = btn.getAttribute('data-sku') || '—';
-      m.querySelector('#pd-name').textContent = btn.getAttribute('data-name') || '—';
-      m.querySelector('#pd-price').textContent = fmtCurrency(btn.getAttribute('data-price'));
-      m.querySelector('#pd-stock').textContent = btn.getAttribute('data-stock') || '0';
+      var el;
+      el = m.querySelector('#pd-sku'); if (el) el.textContent = btn.getAttribute('data-sku') || '—';
+      el = m.querySelector('#pd-name'); if (el) el.textContent = btn.getAttribute('data-name') || '—';
+      el = m.querySelector('#pd-price'); if (el) el.textContent = fmtCurrency(btn.getAttribute('data-price'));
+      el = m.querySelector('#pd-stock'); if (el) el.textContent = btn.getAttribute('data-stock') || '0';
       var exp = btn.getAttribute('data-expires_at') || '';
-      m.querySelector('#pd-exp').textContent = exp !== '' ? exp : '—';
+      el = m.querySelector('#pd-exp'); if (el) el.textContent = exp !== '' ? exp : '—';
       var st = btn.getAttribute('data-status') || '';
-      m.querySelector('#pd-status').textContent = st ? (st.toLowerCase()==='active'?'Activo':(st.toLowerCase()==='retired'?'Retirado':st)) : '—';
+      el = m.querySelector('#pd-status'); if (el) el.textContent = st ? (st.toLowerCase()==='active'?'Activo':(st.toLowerCase()==='retired'?'Retirado':st)) : '—';
       var desc = btn.getAttribute('data-description') || '';
-      m.querySelector('#pd-desc').textContent = desc !== '' ? desc : 'Sin descripción';
+      el = m.querySelector('#pd-desc'); if (el) el.textContent = desc !== '' ? desc : 'Sin descripción';
+      // Imagen
+      try {
+        var imgName = btn.getAttribute('data-image') || '';
+        var imgEl = m.querySelector('#pd-img');
+        if (imgEl) {
+          if (imgName) {
+            imgEl.src = '<?= BASE_URL ?>/uploads/' + imgName;
+            imgEl.style.display = '';
+          } else {
+            imgEl.removeAttribute('src');
+            imgEl.style.display = 'none';
+          }
+        }
+      } catch(_){ }
       // No tabla adicional: solo campos principales y descripción
       // Mostrar modal
       if (window.jQuery && jQuery.fn && jQuery.fn.modal) { jQuery(m).modal('show'); }
