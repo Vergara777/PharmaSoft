@@ -1,4 +1,6 @@
-<?php use App\Core\View; use App\Helpers\Flash; use App\Helpers\Auth; $title = $title ?? APP_NAME; ?>
+<?php use App\Core\View; use App\Helpers\Flash; use App\Helpers\Auth; $title = $title ?? APP_NAME;   // Persisted UI state: sidebar hidden (cookie fallback to avoid flicker on navigation)
+  $sidebarHidden = (isset($_COOKIE['psSidebarHidden']) && $_COOKIE['psSidebarHidden'] === '1');
+?>
 <?php
   // Detect auth and route to adapt layout (e.g., login page should be clean)
   $isAuth = Auth::check();
@@ -181,7 +183,7 @@
     .ps-user-dd .btn-profile { }
     .ps-user-dd .btn-logout { }
     /* Sidebar hide/show behavior */
-    .sidebar-hidden .main-sidebar { display: none !important; }
+    body.sidebar-hidden .main-sidebar { display: none !important; }
     .sidebar-hidden .content-wrapper { margin-left: 0 !important; }
     /* Brand that appears only when sidebar is hidden */
     .ps-topbrand { display: none; align-items: center; gap: 8px; font-weight: 900; color: #0f172a; margin-left: 6px; margin-right: 10px; font-size: 16px; }
@@ -207,13 +209,13 @@
     .sidebar-hidden .ps-topbrand { display: inline-flex; }
   </style>
 </head>
-<body class="hold-transition sidebar-mini sidebar-collapse ps-no-anim<?= $isLogin ? ' login-body' : ' layout-navbar-fixed layout-fixed' ?>">
+<body class="hold-transition sidebar-mini ps-no-anim<?= $isLogin ? ' login-body' : ' layout-navbar-fixed layout-fixed' ?><?= $sidebarHidden ? ' sidebar-hidden sidebar-collapse' : '' ?>">
 <div class="wrapper">
   <?php if (!$isLogin && $isAuth): ?>
   <nav class="main-header navbar navbar-expand navbar-white navbar-light ps-navbar">
     <?php $isTech = Auth::isTechnician(); $isAdmin = Auth::isAdmin(); ?>
     <ul class="navbar-nav">
-      <li class="nav-item"><a class="nav-link" id="psToggleSidebar" data-widget="pushmenu" href="#"><i class="fas fa-bars"></i></a></li>
+      <li class="nav-item"><a class="nav-link" id="psToggleSidebar" href="#" aria-label="Alternar menú" role="button" style="cursor:pointer" onclick="return (function(e){try{if(e)e.preventDefault();var b=document.body;var h=!b.classList.contains('sidebar-hidden');b.classList.toggle('sidebar-hidden',h);b.classList.toggle('sidebar-collapse',h);b.classList.remove('sidebar-open');var s=document.querySelector('.main-sidebar');if(s) s.style.display=h?'none':'';try{localStorage.setItem('psSidebarHidden',h?'1':'0');}catch(_){ }document.cookie='psSidebarHidden='+(h?'1':'0')+'; max-age=31536000; path=/';}catch(_){ } return false;})(event)"><i class="fas fa-bars"></i></a></li>
       <li class="nav-item align-self-center"><span class="ps-topbrand"><span class="icon"><i class="fas fa-capsules"></i></span><span class="name"><?= View::e(APP_NAME) ?></span></span></li>
       <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/dashboard" class="nav-link<?= $isDash ? ' active' : '' ?>"><i class="fas fa-tachometer-alt mr-1" aria-hidden="true"></i> Dashboard</a></li>
       <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/products" class="nav-link<?= $isProductsPg ? ' active' : '' ?>"><i class="fas fa-pills mr-1" aria-hidden="true"></i> Productos</a></li>
@@ -362,20 +364,68 @@
     const key = 'psSidebarHidden';
     const body = document.body;
     const apply = (hidden) => {
-      if (hidden) { body.classList.add('sidebar-hidden'); body.classList.add('sidebar-collapse'); }
-      else { body.classList.remove('sidebar-hidden'); }
+      const sidebar = document.querySelector('.main-sidebar');
+      if (hidden) {
+        body.classList.add('sidebar-hidden');
+        body.classList.add('sidebar-collapse');
+        body.classList.remove('sidebar-open');
+        if (sidebar) sidebar.style.display = 'none';
+      } else {
+        // Show sidebar fully expanded initially
+        body.classList.remove('sidebar-hidden');
+        body.classList.remove('sidebar-collapse');
+        body.classList.remove('sidebar-open');
+        if (sidebar) sidebar.style.display = '';
+      }
+    };
+    const readCookie = (name) => {
+      try {
+        const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}\\(\\)\\[\\]\\/\\+^])/g,'\\$1') + '=([^;]*)'));
+        return m ? decodeURIComponent(m[1]) : null;
+      } catch(_) { return null; }
+    };
+    const writeCookie = (name, value) => {
+      try { document.cookie = name + '=' + encodeURIComponent(value) + '; max-age=31536000; path=/'; } catch(_) {}
     };
     try {
-      const saved = localStorage.getItem(key);
-      if (saved === '1') apply(true);
+      const c = readCookie('psSidebarHidden');
+      const saved = (c !== null) ? c : localStorage.getItem(key);
+      if (saved === '1') apply(true); else if (saved === '0') apply(false);
     } catch (e) {}
-    const btn = document.getElementById('psToggleSidebar');
-    if (btn) btn.addEventListener('click', function(ev){
-      ev.preventDefault();
+    const onToggle = function(ev){
+      if (ev) ev.preventDefault();
       const hidden = !body.classList.contains('sidebar-hidden');
       apply(hidden);
       try { localStorage.setItem(key, hidden ? '1' : '0'); } catch (e) {}
+      writeCookie('psSidebarHidden', hidden ? '1' : '0');
+    };
+    // Expose globally for inline fallback
+    window.psToggleSidebar = onToggle;
+    const btn = document.getElementById('psToggleSidebar');
+    if (btn) btn.addEventListener('click', onToggle);
+    // Delegated fallback (por si el botón cambia entre vistas)
+    document.addEventListener('click', function(e){
+      const t = e.target.closest && e.target.closest('#psToggleSidebar');
+      if (t) onToggle(e);
     });
+    // Expand on hover (remove collapse) and collapse when cursor leaves the sidebar to anywhere else
+    (function(){
+      const sb = document.querySelector('.main-sidebar');
+      if (!sb) return;
+      function isVisible(){ return !body.classList.contains('sidebar-hidden'); }
+      sb.addEventListener('mouseenter', function(){
+        if (isVisible()) body.classList.remove('sidebar-collapse');
+      });
+      // Use document-level mousemove to detect cursor outside sidebar reliably
+      document.addEventListener('mousemove', function(e){
+        if (!isVisible()) return;
+        // If already collapsed, nothing to do
+        if (body.classList.contains('sidebar-collapse')) return;
+        // Collapse when pointer is outside the sidebar
+        const inside = sb.contains(e.target);
+        if (!inside) body.classList.add('sidebar-collapse');
+      });
+    })();
   })();
   // Sync content offset with real navbar height to avoid any white gap
   (function(){
