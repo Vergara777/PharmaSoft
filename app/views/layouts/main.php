@@ -185,7 +185,25 @@
     .sidebar-hidden .content-wrapper { margin-left: 0 !important; }
     /* Brand that appears only when sidebar is hidden */
     .ps-topbrand { display: none; align-items: center; gap: 8px; font-weight: 900; color: #0f172a; margin-left: 6px; margin-right: 10px; font-size: 16px; }
-    .ps-topbrand .icon { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; background: #e0e7ff; color: #1d4ed8; }
+    .ps-topbrand .icon { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; background: #e0e7ff; color: #1d4ed8; box-shadow: 0 0 0 rgba(29,78,216,0); }
+    /* RGB glow when sidebar hidden */
+    .sidebar-hidden .ps-topbrand .name {
+      background: linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6, #fb7185, #f59e0b, #34d399, #60a5fa);
+      background-size: 400% 100%;
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+      animation: psHue 8s linear infinite, psGlow 2.2s ease-in-out infinite alternate, psFloat 6s ease-in-out infinite;
+      text-shadow: 0 0 0 rgba(99,102,241,0);
+    }
+    .sidebar-hidden .ps-topbrand .icon { animation: psIconGlow 2.2s ease-in-out infinite alternate; }
+    @keyframes psHue { 0% { background-position: 0% 50%; } 100% { background-position: 100% 50%; } }
+    @keyframes psGlow { 0% { text-shadow: 0 0 0px rgba(99,102,241,.0), 0 0 0px rgba(147,197,253,.0); }
+                         100% { text-shadow: 0 0 10px rgba(99,102,241,.35), 0 0 18px rgba(147,197,253,.25); } }
+    @keyframes psIconGlow { 0% { box-shadow: 0 0 0 rgba(59,130,246,0); }
+                            100% { box-shadow: 0 0 16px rgba(59,130,246,.45); } }
+    @keyframes psFloat { 0% { transform: translateY(0); } 50% { transform: translateY(-1px); } 100% { transform: translateY(0); } }
+    @media (prefers-reduced-motion: reduce) {
+      .sidebar-hidden .ps-topbrand .name, .sidebar-hidden .ps-topbrand .icon { animation: none; }
+    }
     .sidebar-hidden .ps-topbrand { display: inline-flex; }
   </style>
 </head>
@@ -196,7 +214,7 @@
     <?php $isTech = Auth::isTechnician(); $isAdmin = Auth::isAdmin(); ?>
     <ul class="navbar-nav">
       <li class="nav-item"><a class="nav-link" id="psToggleSidebar" data-widget="pushmenu" href="#"><i class="fas fa-bars"></i></a></li>
-      <li class="nav-item align-self-center"><span class="ps-topbrand"><span class="icon"><i class="fas fa-capsules"></i></span><span><?= View::e(APP_NAME) ?></span></span></li>
+      <li class="nav-item align-self-center"><span class="ps-topbrand"><span class="icon"><i class="fas fa-capsules"></i></span><span class="name"><?= View::e(APP_NAME) ?></span></span></li>
       <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/dashboard" class="nav-link<?= $isDash ? ' active' : '' ?>"><i class="fas fa-tachometer-alt mr-1" aria-hidden="true"></i> Dashboard</a></li>
       <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/products" class="nav-link<?= $isProductsPg ? ' active' : '' ?>"><i class="fas fa-pills mr-1" aria-hidden="true"></i> Productos</a></li>
       <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/sales" class="nav-link<?= $isSalesPg ? ' active' : '' ?>"><i class="fas fa-cash-register mr-1" aria-hidden="true"></i> Ventas</a></li>
