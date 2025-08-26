@@ -10,7 +10,13 @@ use App\Helpers\Audit;
 class ProfileController extends Controller {
     public function index(): void {
         if (!Auth::check()) { $this->redirect('/auth/login'); }
-        $this->view('profile/index', ['user' => Auth::user(), 'title' => 'Perfil']);
+        // Fetch full user data from DB (session may only have a subset)
+        $dbUser = (new \App\Models\User())->find((int) Auth::id());
+        // Merge with session to keep avatar/role if needed
+        $sessionUser = Auth::user() ?: [];
+        // Session wins for fields present, DB fills the rest
+        $user = array_replace((array)$dbUser, (array)$sessionUser);
+        $this->view('profile/index', ['user' => $user, 'title' => 'Perfil']);
     }
 
     public function uploadAvatar(): void {

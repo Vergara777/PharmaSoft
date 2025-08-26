@@ -89,4 +89,20 @@ $router->get('/sales/invoice/{id}', 'SalesController@invoice');
 $router->get('/sales/export', 'SalesController@export');
 $router->get('/sales/template', 'SalesController@template');
 
+// Suppliers (CRUD)
+$router->get('/suppliers', 'SuppliersController@index');
+$router->get('/suppliers/create', 'SuppliersController@create');
+$router->post('/suppliers/store', 'SuppliersController@store');
+$router->get('/suppliers/edit/{id}', 'SuppliersController@edit');
+$router->post('/suppliers/update/{id}', 'SuppliersController@update');
+$router->post('/suppliers/delete/{id}', 'SuppliersController@destroy');
+
+// Categories (CRUD)
+$router->get('/categories', 'CategoriesController@index');
+$router->get('/categories/create', 'CategoriesController@create');
+$router->post('/categories/store', 'CategoriesController@store');
+$router->get('/categories/edit/{id}', 'CategoriesController@edit');
+$router->post('/categories/update/{id}', 'CategoriesController@update');
+$router->post('/categories/delete/{id}', 'CategoriesController@destroy');
+
 $router->dispatch();

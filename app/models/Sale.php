@@ -365,9 +365,9 @@ class Sale extends Model {
             $saleId = (int)$this->db->lastInsertId();
 
             $total = 0.0;
-            $insItem = $this->db->prepare('INSERT INTO sale_items (sale_id, product_id, qty, unit_price, line_total) VALUES (?,?,?,?,?)');
+            $insItem = $this->db->prepare('INSERT INTO sale_items (sale_id, product_id, qty, unit_price, unit_cost, line_total) VALUES (?,?,?,?,?,?)');
             $updStock = $this->db->prepare('UPDATE products SET stock = stock - ? WHERE id = ?');
-            $selProd = $this->db->prepare('SELECT stock, expires_at FROM products WHERE id = ? FOR UPDATE');
+            $selProd = $this->db->prepare('SELECT stock, expires_at, cost FROM products WHERE id = ? FOR UPDATE');
 
             foreach ($norm as $it) {
                 $selProd->execute([$it['product_id']]);
@@ -375,6 +375,7 @@ class Sale extends Model {
                 if (!$row) { throw new \RuntimeException('Producto no existe'); }
                 $stock = (int)$row['stock'];
                 $expiresAt = $row['expires_at'] ?? null;
+                $unitCost = isset($row['cost']) ? (float)$row['cost'] : 0.0;
                 if ($stock < $it['qty']) { throw new \RuntimeException('Stock insuficiente para un ítem'); }
                 if (!empty($expiresAt)) {
                     $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
@@ -382,7 +383,7 @@ class Sale extends Model {
                 }
 
                 $line = $it['qty'] * $it['unit_price'];
-                $insItem->execute([$saleId, $it['product_id'], $it['qty'], $it['unit_price'], $line]);
+                $insItem->execute([$saleId, $it['product_id'], $it['qty'], $it['unit_price'], $unitCost, $line]);
                 $updStock->execute([$it['qty'], $it['product_id']]);
                 $total += $line;
             }

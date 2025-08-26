@@ -1,4 +1,16 @@
 <?php use App\Core\View; use App\Helpers\Flash; use App\Helpers\Auth; $title = $title ?? APP_NAME; ?>
+<?php
+  // Detect auth and route to adapt layout (e.g., login page should be clean)
+  $isAuth = Auth::check();
+  $reqUri = $_SERVER['REQUEST_URI'] ?? '';
+  $isLogin = (strpos($reqUri, '/auth/login') !== false);
+  // Current Colombia time from server
+  try {
+    $coNow = new DateTime('now', new DateTimeZone('America/Bogota'));
+  } catch (Exception $e) {
+    $coNow = new DateTime('now');
+  }
+?>
 <!doctype html>
 <html lang="es">
 <head>
@@ -10,7 +22,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.7/dist/sweetalert2.min.css">
   <style>
     /* Loading Overlay */
-    .app-loading-overlay { position: fixed; inset: 0; background: rgba(17,24,39,.45); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); z-index: 4000; display: none; align-items: center; justify-content: center; }
+    .app-loading-overlay { position: fixed; inset: 0; background: rgba(17,24,39,.45); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); z-index: 5005; display: none; align-items: center; justify-content: center; }
     .app-loading-box { background: #0b1220; color: #e5e7eb; padding: 18px 22px; border-radius: 12px; box-shadow: 0 24px 60px rgba(0,0,0,.45); display: flex; gap: 14px; align-items: center; min-width: 280px; }
     .app-spinner { width: 30px; height: 30px; border: 3px solid rgba(255,255,255,.15); border-top-color: #3b82f6; border-radius: 50%; animation: spin .9s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -21,12 +33,12 @@
     .app-loading-overlay.fade-exit-active { opacity: 0; transition: opacity .18s ease-in; }
     /* Toasts */
     /* Force dark toast background and light text with high specificity */
-    .swal2-container .swal2-popup.ps-toast { background: #0b1220 !important; color: #e5e7eb !important; border-radius: 14px; padding: 14px 16px; box-shadow: 0 28px 64px rgba(0,0,0,.5); width: 460px; border: 1px solid rgba(255,255,255,.06); }
+    .swal2-container .swal2-popup.ps-toast { background: #0b1220 !important; color: #e5e7eb !important; border-radius: 14px; padding: 14px 16px; box-shadow: none !important; width: 460px; border: 1px solid rgba(255,255,255,.06); }
     .swal2-container .swal2-popup.ps-toast .swal2-html-container { color: inherit !important; margin: 0 !important; }
     .swal2-popup.ps-toast .swal2-close { color: #e5e7eb; opacity: .7; }
     .swal2-popup.ps-toast .swal2-timer-progress-bar { height: 4px; background: #22c55e; border-radius: 0 0 12px 12px; }
     .ps-toast-body { display: grid; grid-template-columns: 46px 1fr; gap: 14px; align-items: flex-start; }
-    .ps-toast-icon { width: 46px; height: 46px; border-radius: 11px; display: grid; place-items: center; color: #0b1220; font-size: 18px; box-shadow: inset 0 -2px 0 rgba(0,0,0,.12); }
+    .ps-toast-icon { width: 46px; height: 46px; border-radius: 11px; display: grid; place-items: center; color: #0b1220; font-size: 18px; box-shadow: none !important; }
     .ps-toast-title { font-weight: 900; color: #f9fafb; margin-top: 0; font-size: 15px; }
     .ps-toast-text { color: #f3f4f6; opacity: .98; margin-top: 4px; font-size: 14px; font-weight: 700; }
     .ps-toast.ps-success .ps-toast-icon { background: #86efac; }
@@ -39,7 +51,7 @@
     .ps-toast.ps-info .swal2-timer-progress-bar { background: #3b82f6; }
     /* Fallback toast container and item (when SweetAlert2 not available) */
     .ps-fallback-toasts { position: fixed; right: 16px; top: 16px; z-index: 4005; display: grid; gap: 10px; }
-    .ps-fallback-toast { background: #0b1220; color: #e5e7eb; border-radius: 14px; padding: 14px 16px; box-shadow: 0 28px 64px rgba(0,0,0,.5); min-width: 320px; max-width: 480px; display: grid; grid-template-columns: 46px 1fr 18px; gap: 14px; align-items: start; border: 1px solid rgba(255,255,255,.06); }
+    .ps-fallback-toast { background: #0b1220; color: #e5e7eb; border-radius: 14px; padding: 14px 16px; box-shadow: none !important; min-width: 320px; max-width: 480px; display: grid; grid-template-columns: 46px 1fr 18px; gap: 14px; align-items: start; border: 1px solid rgba(255,255,255,.06); }
     .ps-fallback-icon { width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center; color: #111827; font-size: 18px; box-shadow: inset 0 -2px 0 rgba(0,0,0,.12); }
     .ps-fallback-title { font-weight: 900; color: #f9fafb; margin-top: 2px; }
     .ps-fallback-text { color: #f3f4f6; opacity: .98; margin-top: 4px; font-weight: 700; }
@@ -55,6 +67,27 @@
     .ps-fb-info    .ps-fallback-bar { background: #3b82f6; }
     /* Top loading bar */
     .ps-topbar { position: fixed; top: 0; left: 0; height: 3px; background: #3c8dbc; width: 0; opacity: 0; z-index: 5000; transition: width .3s ease, opacity .2s ease; }
+    /* Slower sidebar transitions (AdminLTE override) */
+    .sidebar-mini .main-sidebar,
+    .sidebar-mini .content-wrapper,
+    .sidebar-mini .main-header,
+    .sidebar-mini .main-footer {
+      transition: margin-left .45s ease, width .45s ease, left .45s ease !important;
+    }
+    .sidebar-mini.sidebar-collapse .main-sidebar,
+    .sidebar-mini.sidebar-collapse .content-wrapper,
+    .sidebar-mini.sidebar-collapse .main-header,
+    .sidebar-mini.sidebar-collapse .main-footer {
+      transition: margin-left .45s ease, width .45s ease, left .45s ease !important;
+    }
+    /* Disable sidebar transitions during first paint to avoid flicker */
+    .ps-no-anim .main-sidebar,
+    .ps-no-anim .content-wrapper,
+    .ps-no-anim .main-header,
+    .ps-no-anim .main-footer { transition: none !important; }
+    /* Colombia time chip */
+    .ps-co-time { position: fixed; left: 16px; bottom: 16px; z-index: 5001; background: rgba(255,255,255,.95); color: #1f2937; border: 1px solid #e5e7eb; border-radius: 8px; padding: 6px 10px; box-shadow: 0 8px 22px rgba(0,0,0,.12); font-size: 13px; display: inline-flex; align-items: center; gap: 8px; }
+    .ps-co-time .fa-clock { color: #3c8dbc; }
     /* Compact mini loader */
     .ps-mini-loader { position: fixed; right: 16px; bottom: 16px; z-index: 4006; background: #0b1220; color: #e5e7eb; padding: 8px 12px; border-radius: 10px; display: none; align-items: center; gap: 8px; box-shadow: 0 16px 40px rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.06); }
     .ps-mini-spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.15); border-top-color: #3b82f6; border-radius: 50%; animation: spin .9s linear infinite; }
@@ -82,12 +115,44 @@
       .ps-modal-dialog { width: 96%; margin: 10px auto; max-height: calc(100vh - 20px); }
       .ps-modal-body { max-height: calc(100vh - 170px); }
     }
-    /* Disable pointer events on app while busy (overlay active) */
-    body.app-busy #content, body.app-busy main, body.app-busy .wrapper { pointer-events: none; }
+    /* Disable pointer events app-wide while busy; keep overlay and confirm dialogs interactive */
+    body.app-busy { cursor: wait; }
+    body.app-busy * { pointer-events: none !important; }
+    /* Exceptions: Loading overlay and confirmation modals must remain clickable */
+    body.app-busy .app-loading-overlay,
+    body.app-busy .app-loading-overlay *,
+    body.app-busy .swal2-container,
+    body.app-busy .swal2-container *,
+    body.app-busy #psConfirmFallback,
+    body.app-busy #psConfirmFallback * { pointer-events: auto !important; }
+    body.app-busy .app-loading-overlay { display: flex !important; }
+    /* Ensure confirmation dialogs render above any app overlays */
+    .swal2-container { z-index: 5006 !important; }
+    #psConfirmFallback { z-index: 5006 !important; }
+    /* Keep header fixed and avoid overlap with content when fixed layout active
+       Use real AdminLTE navbar height (~56px) to avoid big white gap */
+    :root { --ps-header-h: 56px; --ps-header-gap: 16px; }
+    .layout-navbar-fixed .content-wrapper { padding-top: calc(var(--ps-header-h, 56px) - var(--ps-header-gap, 16px)); }
+    @media (max-width: 576px) { .layout-navbar-fixed .content-wrapper { padding-top: calc(var(--ps-header-h, 56px) - var(--ps-header-gap, 16px)); } }
+    .layout-navbar-fixed .content-wrapper > .content { padding-top: 0; }
+    .layout-navbar-fixed .content-wrapper .container-fluid { padding-top: 0; }
+    /* Quitar cualquier margen/padding superior del primer bloque para que quede pegado */
+    .layout-navbar-fixed .content-wrapper .container-fluid > *:first-child { margin-top: 0 !important; padding-top: 0 !important; }
+    /* Pegar visualmente la primera card al borde de la navbar (tuck under shadow) */
+    .layout-navbar-fixed .content-wrapper .container-fluid > .card:first-child,
+    .layout-navbar-fixed .content-wrapper .container-fluid > .products-card:first-child { margin-top: -16px !important; }
+    /* Sticky modal header when scrolling modal body */
+    .ps-modal-header { position: sticky; top: 0; z-index: 2; background: #fff; }
+    /* Global Empty State */
+    .ps-empty-state { display: grid; place-items: center; padding: 48px 16px; color: #6b7280; }
+    .ps-empty-state .box { text-align: center; max-width: 680px; }
+    .ps-empty-state .title { font-weight: 900; font-size: 1.25rem; color: #111827; }
+    .ps-empty-state .desc { margin-top: 6px; font-weight: 700; }
   </style>
 </head>
-<body class="hold-transition sidebar-mini">
+<body class="hold-transition sidebar-mini sidebar-collapse ps-no-anim<?= $isLogin ? ' login-body' : ' layout-navbar-fixed layout-fixed' ?>">
 <div class="wrapper">
+  <?php if (!$isLogin && $isAuth): ?>
   <nav class="main-header navbar navbar-expand navbar-white navbar-light">
     <?php $isTech = Auth::isTechnician(); $isAdmin = Auth::isAdmin(); ?>
     <ul class="navbar-nav">
@@ -149,21 +214,27 @@
           <li class="nav-item"><a href="<?= BASE_URL ?>/sales" class="nav-link"><i class="nav-icon fas fa-cash-register"></i><p>Ventas</p></a></li>
           <?php if ($isAdmin): ?>
             <li class="nav-item"><a href="<?= BASE_URL ?>/users" class="nav-link"><i class="nav-icon fas fa-users"></i><p>Usuarios</p></a></li>
+            <li class="nav-item"><a href="<?= BASE_URL ?>/suppliers" class="nav-link"><i class="nav-icon fas fa-truck"></i><p>Proveedores</p></a></li>
+            <li class="nav-item"><a href="<?= BASE_URL ?>/categories" class="nav-link"><i class="nav-icon fas fa-tags"></i><p>Categorías</p></a></li>
           <?php endif; ?>
           <li class="nav-item"><a href="<?= BASE_URL ?>/profile" class="nav-link"><i class="nav-icon fas fa-user"></i><p>Perfil</p></a></li>
         </ul>
       </nav>
     </div>
   </aside>
-  <div class="content-wrapper">
-    <section class="content pt-3">
+  <?php endif; ?>
+  <div class="content-wrapper"<?= $isLogin ? ' style="margin-left:0;"' : '' ?> >
+    <section class="content pt-0">
       <div class="container-fluid">
         <?php include $viewFile; ?>
       </div>
     </section>
   </div>
+  <?php if (!$isLogin && $isAuth): ?>
   <footer class="main-footer small"><strong>&copy; <?= date('Y') ?> PharmaSoft</strong></footer>
+  <?php endif; ?>
 </div>
+<?php if (!$isLogin && $isAuth): ?>
 <!-- Global Floating Cart Button and Modal -->
 <button id="globalCartFab" class="cart-fab" title="Ver carrito" aria-label="Ver carrito">
   <i class="fas fa-shopping-cart" aria-hidden="true"></i>
@@ -196,6 +267,7 @@
   </div>
   <div class="ps-modal-backdrop" id="globalCartModalBackdrop"></div>
 </div>
+<?php endif; ?>
 <!-- Loading Overlay -->
 <div class="app-loading-overlay" id="appLoadingOverlay" aria-hidden="true">
   <div class="app-loading-box">
@@ -212,11 +284,37 @@
   <div class="ps-mini-spinner" aria-hidden="true"></div>
   <span id="psMiniLoaderText">Cargando...</span>
 </div>
+<!-- Colombia time chip (visible en todo el sistema) -->
+<div id="psCoTime" class="ps-co-time" aria-live="polite">
+  <i class="far fa-clock" aria-hidden="true"></i>
+  <span class="d-none d-md-inline">Colombia:</span>
+  <span id="psCoDateText"><?php echo htmlspecialchars($coNow->format('d/m/Y')); ?></span>
+  <span id="psCoTimeText"><?php echo htmlspecialchars($coNow->format('h:i:s A')); ?></span>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.7/dist/sweetalert2.all.min.js"></script>
-<script src="<?= BASE_URL ?>/js/confirm-modal.js?v=20250824"></script>
+<script src="<?= BASE_URL ?>/js/confirm-modal.js?v=20250826-0138"></script>
+<script>
+  // Sync content offset with real navbar height to avoid any white gap
+  (function(){
+    function setHeaderH(){
+      try {
+        var nav = document.querySelector('.main-header.navbar');
+        var h = nav ? Math.ceil(nav.getBoundingClientRect().height) : 56;
+        document.documentElement.style.setProperty('--ps-header-h', h + 'px');
+      } catch(_){}
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', setHeaderH);
+    } else { setHeaderH(); }
+    window.addEventListener('resize', function(){ setTimeout(setHeaderH, 50); });
+    // Recompute after AdminLTE layout events
+    document.addEventListener('shown.lte.pushmenu', setHeaderH);
+    document.addEventListener('collapsed.lte.pushmenu', setHeaderH);
+  })();
+</script>
 <script>
   // SweetAlert2 Toast (enhanced) if available
   const Toast = (window.Swal ? Swal.mixin({
@@ -332,6 +430,40 @@
       notify({ icon:'warning', title:'Debug Toast', text:'notify() está funcionando.' });
     }
   })();
+  
+
+  // Persist sidebar collapsed state (hamburger) across reloads
+  (function sidebarPersistence(){
+    try {
+      var KEY = 'ps.sidebar.collapsed';
+      // Apply saved state early after scripts load
+      var saved = null;
+      try { saved = localStorage.getItem(KEY); } catch(_) { saved = null; }
+      // Default collapsed (already set on <body>), expand only if saved === '0'
+      if (saved === '0') {
+        try { document.body.classList.remove('sidebar-collapse'); } catch(_){ }
+      }
+      // Update storage on toggle
+      function saveState(){
+        var isCollapsed = document.body.classList.contains('sidebar-collapse');
+        try { localStorage.setItem(KEY, isCollapsed ? '1' : '0'); } catch(_){ }
+      }
+      // Listen to AdminLTE pushmenu events if available
+      if (window.$ && $.fn && typeof $(document).on === 'function') {
+        $(document).on('collapsed.lte.pushmenu shown.lte.pushmenu', function(){ saveState(); });
+      }
+      // Fallback: also hook the hamburger click
+      var btn = document.querySelector('[data-widget="pushmenu"]');
+      if (btn) {
+        btn.addEventListener('click', function(){ setTimeout(saveState, 50); });
+      }
+      // Re-enable transitions after first paint to avoid flicker
+      function enableTransitions(){ try { document.body.classList.remove('ps-no-anim'); } catch(_){} }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function(){ setTimeout(enableTransitions, 50); });
+      } else { setTimeout(enableTransitions, 50); }
+    } catch(_){ }
+  })();
 
   // Global navigation loading (all internal links)
   (function(){
@@ -349,7 +481,8 @@
     window.addEventListener('beforeunload', function(){ try { if (window.loadingBar) window.loadingBar.start('Cargando...'); } catch(_){ } });
   })();
 
-  // Global Cart (floating) available on all pages
+  // Global Cart (floating) only when authenticated and not on login page
+  <?php if (!$isLogin && $isAuth): ?>
   (function globalCart(){
     var KEY = 'pharmasoft_sales_draft';
     var LEGACY = 'pharmasoft_pending_cart';
@@ -424,10 +557,12 @@
       if (mTotal) mTotal.textContent = fmt(total(items));
       var btns = mBody ? mBody.querySelectorAll('.btnRemoveItem') : [];
       if (btns && btns.forEach){ btns.forEach(function(b){ b.addEventListener('click', function(){
-        try { if (window.loadingBar) window.loadingBar.start('Quitando...'); } catch(_){ }
+        // Full-screen loader with minimum 4.5s for removing single item
+        try { window.bannerLoadingMinDuration = 4500; } catch(_){ }
+        try { if (window.bannerLoading) bannerLoading(true, 'Quitando artículo...'); } catch(_){ }
         var tr=b.closest('tr'); var idx = tr ? parseInt(tr.getAttribute('data-i')||'-1',10) : -1; var arr = read();
         if (idx>=0 && idx < arr.length){ arr.splice(idx,1); write(arr); render(); }
-        try { if (window.loadingBar) window.loadingBar.stop(); } catch(_){ }
+        try { if (window.bannerLoading) bannerLoading(false); } catch(_){ }
       }); }); }
     }
     function open(){ if (!modal) return; render(); modal.style.display='block'; document.body.style.overflow='hidden'; }
@@ -436,12 +571,27 @@
     if (mClose) mClose.addEventListener('click', function(){ close(); });
     if (mBackdrop) mBackdrop.addEventListener('click', function(e){ if (e.target===mBackdrop) close(); });
     if (mClear) mClear.addEventListener('click', function(){
-      try {
-        if (window.Swal && Swal.fire) {
-          return Swal.fire({ title:'Vaciar carrito', text:'¿Desea vaciar el borrador del carrito?', icon:'warning', showCancelButton:true, confirmButtonText:'Sí, vaciar', cancelButtonText:'No' }).then(function(res){ if (res && res.isConfirmed) { write([]); render(); } });
-        }
-      } catch(_){}
-      if (confirm('¿Desea vaciar el borrador del carrito?')) { write([]); render(); }
+      // Close modal first, then confirm, then show loader and clear, and reopen
+      close();
+      var doConfirm = function(){
+        try {
+          if (window.Swal && Swal.fire) {
+            return Swal.fire({ title:'Vaciar carrito', text:'¿Desea vaciar el borrador del carrito?', icon:'warning', showCancelButton:true, confirmButtonText:'Sí, vaciar', cancelButtonText:'No' })
+              .then(function(res){ return !!(res && res.isConfirmed); });
+          }
+        } catch(_){ }
+        return Promise.resolve(!!confirm('¿Desea vaciar el borrador del carrito?'));
+      };
+      doConfirm().then(function(ok){
+        if (!ok) { open(); return; }
+        try { window.bannerLoadingMinDuration = 4500; } catch(_){ }
+        try { if (window.bannerLoading) bannerLoading(true, 'Vaciando carrito...'); } catch(_){ }
+        try { write([]); } catch(_){ }
+        try { render(); } catch(_){ }
+        try { if (window.bannerLoading) bannerLoading(false); } catch(_){ }
+        // Reopen modal after operation
+        open();
+      });
     });
     // expose for live control from any page
     window.psCart = window.psCart || {};
@@ -455,6 +605,7 @@
       if (btnGoCreateSale) btnGoCreateSale.style.display = isOnCreateSale() ? 'none' : '';
     } catch(_){ }
   })();
+  <?php endif; ?>
 
   // Generic confirmation helper
   window.confirmAction = function(opts = {}) {
@@ -521,6 +672,42 @@
   const topBar = document.getElementById('psTopBar');
   const miniLoader = document.getElementById('psMiniLoader');
   const miniLoaderText = document.getElementById('psMiniLoaderText');
+  // Global centered loading banner with interaction lock
+  (function(){
+    const overlay = document.getElementById('appLoadingOverlay');
+    const txt = document.getElementById('appLoadingText');
+    let busyCount = 0; // reference count to support nested calls
+    function show(text){
+      try { if (txt && text) txt.textContent = String(text); } catch(_){ }
+      busyCount++;
+      if (busyCount < 1) busyCount = 1;
+      if (overlay) {
+        overlay.classList.remove('fade-exit','fade-exit-active');
+        overlay.classList.add('fade-enter');
+        overlay.style.display = 'flex';
+        requestAnimationFrame(() => overlay.classList.add('fade-enter-active'));
+        overlay.setAttribute('aria-hidden', 'false');
+      }
+      document.body.classList.add('app-busy');
+      document.documentElement.style.overflow = 'hidden';
+    }
+    function hide(){
+      busyCount = Math.max(0, busyCount - 1);
+      if (busyCount > 0) return; // still busy by another process
+      if (overlay) {
+        overlay.classList.remove('fade-enter','fade-enter-active');
+        overlay.classList.add('fade-exit');
+        requestAnimationFrame(() => overlay.classList.add('fade-exit-active'));
+        setTimeout(() => { if (overlay) overlay.style.display = 'none'; }, 200);
+        overlay.setAttribute('aria-hidden', 'true');
+      }
+      document.body.classList.remove('app-busy');
+      document.documentElement.style.overflow = '';
+    }
+    window.bannerLoading = function(on, text){ if (on) show(text || 'Procesando...'); else hide(); };
+    // Expose manual controls
+    window.__appBusy = { inc: () => show(), dec: () => hide(), active: () => busyCount > 0 };
+  })();
   let __lbMin = 6000; // ms, keep loader visible at least 6s
   let __lbStartedAt = 0;
   let __lbHideTimer = null;
@@ -552,6 +739,7 @@
           requestAnimationFrame(function(){ topBar.style.width = '70%'; });
         }
       }
+      try { bannerLoading(true, text || 'Cargando...'); } catch(_){ }
     },
     stop: function(){
       if (!__lbActive) return; // nothing to hide
@@ -563,6 +751,7 @@
       } else {
         __lbDoHide();
       }
+      try { bannerLoading(false); } catch(_){ }
     }
   };
   // Allow runtime adjustment of minimum duration: window.loadingBar.minDuration = 4000
@@ -575,10 +764,40 @@
 
   // Auto-show on form submit (supports data-loading-text on form or submit button)
   $(document).on('submit', 'form', function(e){
-    const btn = this.querySelector('button[type="submit"][data-loading-text], input[type="submit"][data-loading-text]');
-    const text = (btn && btn.getAttribute('data-loading-text')) || this.getAttribute('data-loading-text') || 'Enviando datos...';
-    bannerLoading(true, text);
+    try {
+      // Skip loader for forms that open in new tab or opt-out
+      if (this && (this.getAttribute('target') === '_blank' || this.hasAttribute('data-no-loader'))) {
+        return; // no loader
+      }
+      const btn = this.querySelector('button[type="submit"][data-loading-text], input[type="submit"][data-loading-text]');
+      const text = (btn && btn.getAttribute('data-loading-text')) || this.getAttribute('data-loading-text') || 'Enviando datos...';
+      bannerLoading(true, text);
+    } catch(_) {}
   });
+
+  // Colombia live clock (server-based)
+  (function(){
+    try {
+      var base = <?php echo (int)($coNow->getTimestamp() * 1000); ?>; // ms desde servidor
+      var elT = document.getElementById('psCoTimeText');
+      var elD = document.getElementById('psCoDateText');
+      if (!elT || !elD) return;
+      var fmtT, fmtD;
+      try {
+        var fTime = new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'America/Bogota' });
+        var fDate = new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Bogota' });
+        fmtT = function(ms){ return fTime.format(new Date(ms)); };
+        fmtD = function(ms){ return fDate.format(new Date(ms)); };
+      } catch(_){
+        fmtT = function(ms){ return new Date(ms).toLocaleTimeString('es-CO'); };
+        fmtD = function(ms){ return new Date(ms).toLocaleDateString('es-CO'); };
+      }
+      var t = base;
+      function tick(){ try { elT.textContent = fmtT(t); elD.textContent = fmtD(t); } catch(_){} t += 1000; }
+      tick();
+      setInterval(tick, 1000);
+    } catch(_){ }
+  })();
   // Auto-show during jQuery AJAX (top bar + mini loader)
   $(document).ajaxStart(function(){ loadingBar.start('Cargando...'); });
   $(document).ajaxStop(function(){ loadingBar.stop(); });

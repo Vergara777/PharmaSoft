@@ -6,6 +6,8 @@ use App\Helpers\Auth;
 use App\Helpers\Security;
 use App\Models\Sale;
 use App\Models\Product;
+use App\Models\Category;
+use App\Models\Supplier;
 use App\Helpers\Flash;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -57,7 +59,14 @@ class SalesController extends Controller {
     public function create(): void {
         if (!Auth::check()) { $this->redirect('/auth/login'); }
         $products = (new Product())->all();
-        $this->view('sales/create', ['products' => $products, 'title' => 'Registrar venta']);
+        $categories = (new Category())->all();
+        $suppliers = (new Supplier())->all();
+        $this->view('sales/create', [
+            'products' => $products,
+            'categories' => $categories,
+            'suppliers' => $suppliers,
+            'title' => 'Registrar venta'
+        ]);
     }
 
     public function store(): void {
@@ -72,6 +81,40 @@ class SalesController extends Controller {
         // If arrays are provided, treat as cart
         $isArrayCart = is_array($productIds) && is_array($qtys) && is_array($prices);
         try {
+            // Build a flat list of product IDs to validate
+            $idsToValidate = [];
+            if ($isArrayCart) {
+                $n = min(count($productIds), count($qtys), count($prices));
+                for ($i = 0; $i < $n; $i++) {
+                    $pid = (int)$productIds[$i];
+                    $q = (int)$qtys[$i];
+                    if ($pid > 0 && $q > 0) { $idsToValidate[] = $pid; }
+                }
+            } else {
+                if (is_scalar($productIds)) {
+                    $pid = (int)$productIds;
+                    $q = (int)$qtys;
+                    if ($pid > 0 && $q > 0) { $idsToValidate[] = $pid; }
+                }
+            }
+            // Validate: no expired products allowed
+            if (!empty($idsToValidate)) {
+                $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
+                $pm = new Product();
+                foreach (array_unique($idsToValidate) as $pid) {
+                    $p = $pm->find((int)$pid);
+                    if (!$p || ($p['status'] ?? '') !== 'active') {
+                        throw new \RuntimeException('Producto inválido o inactivo en el carrito.');
+                    }
+                    $exp = $p['expires_at'] ?? null;
+                    if (!empty($exp) && $exp < $today) {
+                        $sku = trim((string)($p['sku'] ?? ''));
+                        $name = trim((string)($p['name'] ?? ''));
+                        $label = $sku !== '' ? ($sku . ' - ' . $name) : $name;
+                        throw new \RuntimeException('No es posible vender productos vencidos: ' . ($label ?: ('ID ' . $pid)) . '.');
+                    }
+                }
+            }
             if ($isArrayCart) {
                 $items = [];
                 $n = min(count($productIds), count($qtys), count($prices));
@@ -102,8 +145,12 @@ class SalesController extends Controller {
             $this->redirect('/sales/invoice/' . $saleId);
         } catch (\Throwable $e) {
             $products = (new Product())->all();
+            $categories = (new Category())->all();
+            $suppliers = (new Supplier())->all();
             $this->view('sales/create', [
                 'products' => $products,
+                'categories' => $categories,
+                'suppliers' => $suppliers,
                 'error' => $e->getMessage(),
                 'title' => 'Registrar venta'
             ]);
@@ -163,15 +210,29 @@ class SalesController extends Controller {
     /** Descargar Excel con ventas del rango from/to actual. */
     public function export(): void {
         if (!Auth::check()) { $this->redirect('/auth/login'); }
+        // Allow exporting all history with all=1
+        $exportAll = isset($_GET['all']) && (string)$_GET['all'] === '1';
         $from = trim((string)($_GET['from'] ?? ''));
         $to = trim((string)($_GET['to'] ?? ''));
         $isYmd = function(string $d){ return (bool)preg_match('/^\d{4}-\d{2}-\d{2}$/', $d); };
-        if (!$isYmd($from) || !$isYmd($to)) {
-            $from = (new \DateTimeImmutable('today'))->format('Y-m-d');
-            $to = $from;
-        }
+
+        // Increase limits for heavy exports
+        @set_time_limit(180);
+        @ini_set('memory_limit', '512M');
+
         $sale = new Sale();
-        $rows = $sale->byDatePaginated($from, $to, 100000, 0);
+        if ($exportAll) {
+            $rows = $sale->allAsc();
+            $from = 'todas';
+            $to = '';
+        } else {
+            if (!$isYmd($from) || !$isYmd($to)) {
+                $from = (new \DateTimeImmutable('today'))->format('Y-m-d');
+                $to = $from;
+            }
+            // Large upper bound to cover big ranges without pagination
+            $rows = $sale->byDatePaginated($from, $to, 1000000, 0);
+        }
 
         $ss = new Spreadsheet();
         $sh = $ss->getActiveSheet();
@@ -204,7 +265,7 @@ class SalesController extends Controller {
         // Autosize
         foreach (range('A','K') as $col) { $sh->getColumnDimension($col)->setAutoSize(true); }
 
-        $filename = 'ventas_' . $from . '_a_' . $to . '.xlsx';
+        $filename = $exportAll ? 'ventas_todas.xlsx' : ('ventas_' . $from . '_a_' . $to . '.xlsx');
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
         header('Cache-Control: max-age=0');

@@ -35,6 +35,33 @@
     </div>
   </div>
   <div class="table-responsive">
+    <?php if (empty($sales)): ?>
+      <?php $hasFilters = !empty($filterId) || !empty($from) || !empty($to); ?>
+      <div class="ps-empty-state" role="status" aria-live="polite">
+        <div class="box">
+          <div class="title"><i class="fas fa-cash-register mr-2" aria-hidden="true"></i> <?= $hasFilters ? 'No hay ventas que coincidan con los filtros' : 'No hay ventas registradas hoy' ?></div>
+          <div class="desc"><?= $hasFilters ? 'Ajusta los filtros e inténtalo de nuevo.' : 'Registra una nueva venta para comenzar.' ?></div>
+        </div>
+      </div>
+      <script>
+        (function(){
+          function showEmptySales(){
+            try {
+              var hasFilters = <?= $hasFilters ? 'true' : 'false' ?>;
+              var title = hasFilters ? 'No hay ventas que coincidan con los filtros' : 'No hay ventas registradas hoy';
+              var text = hasFilters ? 'Ajusta los filtros e inténtalo de nuevo.' : 'Registra una nueva venta para comenzar.';
+              if (window.Swal && typeof Swal.fire === 'function') {
+                Swal.fire({ icon:'info', title:title, text:text, confirmButtonText:'Entendido', allowOutsideClick:true, allowEscapeKey:true });
+              } else if (window.notify) {
+                notify({ icon:'info', title:title, text:text, position:'center' });
+              } else { alert(title); }
+            } catch(_){}
+          }
+          if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showEmptySales);
+          else showEmptySales();
+        })();
+      </script>
+    <?php else: ?>
     <table class="table table-striped mb-0">
       <thead><tr><th>ID</th><th>SKU</th><th>Producto</th><th>Cant.</th><th>P. Unit</th><th>Total</th><th>Cliente</th><th>Contacto</th><th>Atendido por</th><th>Fecha</th><th>Acciones</th></tr></thead>
       <tbody>
@@ -85,6 +112,7 @@
         <?php endforeach; ?>
       </tbody>
     </table>
+    <?php endif; ?>
   </div>
 </div>
 

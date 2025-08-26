@@ -8,6 +8,26 @@
       <div class="form-group"><label>Nombre</label><input name="name" class="form-control" required></div>
       <div class="form-group"><label>Descripción</label><textarea name="description" class="form-control"></textarea></div>
       <div class="form-group"><label>Imagen (opcional)</label><input type="file" name="image" accept="image/*" class="form-control-file"></div>
+      <div class="form-row">
+        <div class="form-group col-md-6">
+          <label>Categoría</label>
+          <select name="category_id" class="form-control">
+            <option value="">(Sin categoría)</option>
+            <?php foreach (($categories ?? []) as $c): ?>
+              <option value="<?= (int)$c['id'] ?>"><?= htmlspecialchars($c['name'] ?? '', ENT_QUOTES, 'UTF-8') ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="form-group col-md-6">
+          <label>Proveedor</label>
+          <select name="supplier_id" class="form-control">
+            <option value="">(Sin proveedor)</option>
+            <?php foreach (($suppliers ?? []) as $s): ?>
+              <option value="<?= (int)$s['id'] ?>"><?= htmlspecialchars($s['name'] ?? '', ENT_QUOTES, 'UTF-8') ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+      </div>
       <div class="form-group"><label>Stock</label><input type="number" name="stock" class="form-control" value="0" min="0" required></div>
       <div class="form-group">
         <label>Precio</label>

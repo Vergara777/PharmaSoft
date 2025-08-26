@@ -13,6 +13,28 @@
           <div class="mb-2">
             <img src="<?= BASE_URL ?>/uploads/<?= View::e($p['image']) ?>" alt="Imagen actual" style="max-height:120px;border:1px solid #ddd;padding:2px;border-radius:4px;">
           </div>
+      <div class="form-row">
+        <div class="form-group col-md-6">
+          <label>Categoría</label>
+          <?php $selCat = isset($p['category_id']) ? (int)$p['category_id'] : null; ?>
+          <select name="category_id" class="form-control">
+            <option value="">(Sin categoría)</option>
+            <?php foreach (($categories ?? []) as $c): $cid = (int)$c['id']; ?>
+              <option value="<?= $cid ?>" <?= ($selCat === $cid ? 'selected' : '') ?>><?= htmlspecialchars($c['name'] ?? '', ENT_QUOTES, 'UTF-8') ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="form-group col-md-6">
+          <label>Proveedor</label>
+          <?php $selSup = isset($p['supplier_id']) ? (int)$p['supplier_id'] : null; ?>
+          <select name="supplier_id" class="form-control">
+            <option value="">(Sin proveedor)</option>
+            <?php foreach (($suppliers ?? []) as $s): $sid = (int)$s['id']; ?>
+              <option value="<?= $sid ?>" <?= ($selSup === $sid ? 'selected' : '') ?>><?= htmlspecialchars($s['name'] ?? '', ENT_QUOTES, 'UTF-8') ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+      </div>
         <?php endif; ?>
         <input type="file" name="image" accept="image/*" class="form-control-file">
       </div>

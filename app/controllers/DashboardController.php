@@ -21,11 +21,55 @@ class DashboardController extends Controller {
                                    ->fetchColumn();
         $todaySalesTotal = (float)$db->query("SELECT COALESCE(SUM(total),0) s FROM sales WHERE DATE(created_at) = CURDATE()")
                                      ->fetchColumn();
-        // Month and Year totals (ganancias = total de ventas)
+        // Month and Year totals (importe de ventas)
         $monthSalesTotal = (float)$db->query("SELECT COALESCE(SUM(total),0) s FROM sales WHERE YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())")
                                      ->fetchColumn();
         $yearSalesTotal = (float)$db->query("SELECT COALESCE(SUM(total),0) s FROM sales WHERE YEAR(created_at)=YEAR(CURDATE())")
                                     ->fetchColumn();
+        // Profit (utilidad) month/year using sale_items snapshot unit_cost when available, fallback to products.cost
+        // Safe runtime detection of columns to avoid fatal errors before migrations are applied
+        $hasProductCost = false; $hasUnitCost = false;
+        try {
+            $hasProductCost = (bool)$db->query("SELECT COUNT(*)>0 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='products' AND COLUMN_NAME='cost'")->fetchColumn();
+        } catch (\Throwable $_) {}
+        try {
+            $hasUnitCost = (bool)$db->query("SELECT COUNT(*)>0 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='sale_items' AND COLUMN_NAME='unit_cost'")->fetchColumn();
+        } catch (\Throwable $_) {}
+
+        $monthProfitItems = 0.0; $yearProfitItems = 0.0; $monthProfitLegacy = 0.0; $yearProfitLegacy = 0.0;
+        // Part 1: multi-item sales via sale_items (only if we can compute a cost expression)
+        if ($hasUnitCost || $hasProductCost) {
+            $costExpr = $hasUnitCost && $hasProductCost ? 'COALESCE(si.unit_cost, p.cost, 0)'
+                       : ($hasUnitCost ? 'COALESCE(si.unit_cost, 0)'
+                       : ($hasProductCost ? 'COALESCE(p.cost, 0)' : '0'));
+            $sqlMonthItems = "SELECT COALESCE(SUM(si.qty * (si.unit_price - {$costExpr})), 0)
+                               FROM sales s
+                               JOIN sale_items si ON si.sale_id = s.id
+                               " . ($hasProductCost ? "JOIN products p ON p.id = si.product_id" : "JOIN products p ON p.id = si.product_id") . "
+                               WHERE YEAR(s.created_at)=YEAR(CURDATE()) AND MONTH(s.created_at)=MONTH(CURDATE())";
+            $sqlYearItems = "SELECT COALESCE(SUM(si.qty * (si.unit_price - {$costExpr})), 0)
+                             FROM sales s
+                             JOIN sale_items si ON si.sale_id = s.id
+                             " . ($hasProductCost ? "JOIN products p ON p.id = si.product_id" : "JOIN products p ON p.id = si.product_id") . "
+                             WHERE YEAR(s.created_at)=YEAR(CURDATE())";
+            try { $monthProfitItems = (float)$db->query($sqlMonthItems)->fetchColumn(); } catch (\Throwable $_) { $monthProfitItems = 0.0; }
+            try { $yearProfitItems = (float)$db->query($sqlYearItems)->fetchColumn(); } catch (\Throwable $_) { $yearProfitItems = 0.0; }
+        }
+        // Part 2: legacy single-item sales stored directly in sales (product_id, qty, unit_price)
+        if ($hasProductCost) {
+            $sqlMonthLegacy = "SELECT COALESCE(SUM(s.qty * (s.unit_price - COALESCE(p.cost, 0))), 0)
+                               FROM sales s
+                               JOIN products p ON p.id = s.product_id
+                               WHERE s.product_id IS NOT NULL AND YEAR(s.created_at)=YEAR(CURDATE()) AND MONTH(s.created_at)=MONTH(CURDATE())";
+            $sqlYearLegacy  = "SELECT COALESCE(SUM(s.qty * (s.unit_price - COALESCE(p.cost, 0))), 0)
+                               FROM sales s
+                               JOIN products p ON p.id = s.product_id
+                               WHERE s.product_id IS NOT NULL AND YEAR(s.created_at)=YEAR(CURDATE())";
+            try { $monthProfitLegacy = (float)$db->query($sqlMonthLegacy)->fetchColumn(); } catch (\Throwable $_) { $monthProfitLegacy = 0.0; }
+            try { $yearProfitLegacy  = (float)$db->query($sqlYearLegacy)->fetchColumn(); } catch (\Throwable $_) { $yearProfitLegacy = 0.0; }
+        }
+        $monthProfit = (float)$monthProfitItems + (float)$monthProfitLegacy;
+        $yearProfit  = (float)$yearProfitItems + (float)$yearProfitLegacy;
         // Support legacy single-item and new multi-item sales
         $todaySales = $db->query(
             "SELECT 
@@ -45,11 +89,22 @@ class DashboardController extends Controller {
              ORDER BY s.created_at DESC, s.id DESC
              "
         )->fetchAll();
-        // Low stock list (top 10)
+        // Low stock and out-of-stock
         $thr = defined('LOW_STOCK_THRESHOLD') ? LOW_STOCK_THRESHOLD : 5;
+        // List including zeros (for cards that already use lowStock count)
         $stmtLowList = $db->prepare("SELECT id, sku, name, stock FROM products WHERE status='active' AND stock <= ? ORDER BY stock ASC, name ASC LIMIT 10");
         $stmtLowList->execute([$thr]);
         $lowStockList = $stmtLowList->fetchAll();
+        // Zero stock count and list (separate)
+        $zeroStock = (int)$db->query("SELECT COUNT(*) FROM products WHERE status='active' AND stock <= 0")->fetchColumn();
+        $zeroStockList = $db->query("SELECT sku, name, stock FROM products WHERE status='active' AND stock <= 0 ORDER BY name ASC LIMIT 5")->fetchAll();
+        // Low-but-positive stock count and list
+        $stmtLowPosCnt = $db->prepare("SELECT COUNT(*) FROM products WHERE status='active' AND stock > 0 AND stock <= ?");
+        $stmtLowPosCnt->execute([$thr]);
+        $lowPositiveCount = (int)$stmtLowPosCnt->fetchColumn();
+        $stmtLowPos = $db->prepare("SELECT sku, name, stock FROM products WHERE status='active' AND stock > 0 AND stock <= ? ORDER BY stock ASC, name ASC LIMIT 5");
+        $stmtLowPos->execute([$thr]);
+        $lowPositiveList = $stmtLowPos->fetchAll();
         // Top products sold (last 30 days)
         $topProducts = $db->query(
             "SELECT p.id, p.sku, p.name, COALESCE(SUM(si.qty),0) AS qty
@@ -106,6 +161,29 @@ class DashboardController extends Controller {
             $msg2 = 'Tienes ' . $expiringSoon . ' producto(s) por vencer (≤ 30 días).' . (empty($items2) ? '' : (' Ej: ' . implode(', ', $items2))) . $extra2;
             Flash::info($msg2, 'Por vencer');
         }
-        $this->view('dashboard/index', compact('totalProducts','lowStock','expiring','expired','expiringSoon','todaySalesCount','todaySalesTotal','monthSalesTotal','yearSalesTotal','todaySales','lowStockList','topProducts','heatmap') + ['title' => 'Dashboard']);
+        // Notify out-of-stock (sin stock)
+        if ($zeroStock > 0) {
+            $items3 = array_map(function($r){
+                $s = isset($r['sku']) ? $r['sku'] : '';
+                $n = isset($r['name']) ? $r['name'] : '';
+                return trim(($s ? ("[$s] ") : '') . $n);
+            }, $zeroStockList ?: []);
+            $extra3 = $zeroStock > count($items3) ? (' y +' . ($zeroStock - count($items3)) . ' más') : '';
+            $msg3 = 'Tienes ' . $zeroStock . ' producto(s) SIN STOCK.' . (empty($items3) ? '' : (' Ej: ' . implode(', ', $items3))) . $extra3;
+            Flash::warning($msg3, 'Inventario agotado');
+        }
+        // Notify low stock (se está acabando) excluding zeros
+        if ($lowPositiveCount > 0) {
+            $items4 = array_map(function($r){
+                $s = isset($r['sku']) ? $r['sku'] : '';
+                $n = isset($r['name']) ? $r['name'] : '';
+                $st = isset($r['stock']) ? (int)$r['stock'] : null;
+                return trim(($s ? ("[$s] ") : '') . $n . ($st !== null ? (' (' . $st . ')') : ''));
+            }, $lowPositiveList ?: []);
+            $extra4 = $lowPositiveCount > count($items4) ? (' y +' . ($lowPositiveCount - count($items4)) . ' más') : '';
+            $msg4 = 'Productos con stock bajo (≤ ' . $thr . '): ' . $lowPositiveCount . '.' . (empty($items4) ? '' : (' Ej: ' . implode(', ', $items4))) . $extra4;
+            Flash::info($msg4, 'Stock bajo');
+        }
+        $this->view('dashboard/index', compact('totalProducts','lowStock','expiring','expired','expiringSoon','todaySalesCount','todaySalesTotal','monthSalesTotal','yearSalesTotal','monthProfit','yearProfit','todaySales','lowStockList','topProducts','heatmap','zeroStock','zeroStockList') + ['title' => 'Dashboard']);
     }
 }

@@ -3,6 +3,8 @@ namespace App\Controllers;
 
 use App\Core\Controller;
 use App\Models\Product;
+use App\Models\Category;
+use App\Models\Supplier;
 use App\Helpers\Auth;
 use App\Helpers\Security;
 use App\Helpers\Flash;
@@ -12,23 +14,46 @@ class ProductsController extends Controller {
     public function index(): void {
         if (!Auth::check()) { $this->redirect('/auth/login'); }
         $q = trim((string)($_GET['q'] ?? ''));
+        $categoryId = isset($_GET['category_id']) && ctype_digit((string)$_GET['category_id']) ? (int)$_GET['category_id'] : null;
         $page = isset($_GET['page']) && ctype_digit((string)$_GET['page']) && (int)$_GET['page'] > 0 ? (int)$_GET['page'] : 1;
         $per = isset($_GET['per']) && ctype_digit((string)$_GET['per']) && (int)$_GET['per'] > 0 ? min((int)$_GET['per'], 100) : 9;
         if ($per < 9) { $per = 9; }
+        // Optional filters
+        $expiryParam = trim((string)($_GET['expiry'] ?? ''));
+        $expiryDays = ($expiryParam !== '' && ctype_digit($expiryParam)) ? (int)$expiryParam : null; // e.g., 30 or 60
+        $stockParam = strtolower(trim((string)($_GET['stock'] ?? '')));
+        $stockFilter = ($stockParam === 'low') ? 'low' : null;
+        $lowThr = defined('LOW_STOCK_THRESHOLD') ? (int)LOW_STOCK_THRESHOLD : 5;
         $prod = new Product();
-        $total = $prod->countSearch($q);
+        // Use filtered counters if any filter is set; otherwise fallback to existing
+        if ($expiryDays !== null || $stockFilter !== null) {
+            $total = $prod->countFiltered($q, $categoryId, $expiryDays, $stockFilter, $lowThr);
+        } else {
+            $total = $prod->countSearch($q, $categoryId);
+        }
         $pages = max(1, (int)ceil($total / $per));
         if ($page > $pages) { $page = $pages; }
         $offset = ($page - 1) * $per;
-        $products = $prod->searchPaginated($q, $per, $offset);
+        if ($expiryDays !== null || $stockFilter !== null) {
+            $products = $prod->searchFilteredPaginated($q, $per, $offset, $categoryId, $expiryDays, $stockFilter, $lowThr);
+        } else {
+            $products = $prod->searchPaginated($q, $per, $offset, $categoryId);
+        }
         // Build a quick lookup of products that have sales references to control UI (delete vs deactivate)
         $ids = array_map(static function($r){ return (int)($r['id'] ?? 0); }, (array)$products);
         $hasSalesIds = array_flip($prod->idsWithSales($ids));
+        $categories = (new Category())->all();
+        $suppliers = (new Supplier())->all();
         $this->view('products/index', [
             'products' => $products,
             'q' => $q,
             'title' => 'Productos',
             'hasSales' => $hasSalesIds,
+            'categories' => $categories,
+            'suppliers' => $suppliers,
+            'categoryId' => $categoryId,
+            'expiry' => $expiryParam,
+            'stock' => $stockFilter,
             'pagination' => [
                 'page' => $page,
                 'per' => $per,
@@ -41,7 +66,9 @@ class ProductsController extends Controller {
     public function create(): void {
         if (!Auth::check()) { $this->redirect('/auth/login'); }
         if (!Auth::isAdmin()) { Flash::error('No tienes permisos para crear productos', 'Acceso denegado'); $this->redirect('/products'); return; }
-        $this->view('products/create', ['title' => 'Nuevo producto']);
+        $categories = (new Category())->all();
+        $suppliers = (new Supplier())->all();
+        $this->view('products/create', ['title' => 'Nuevo producto', 'categories' => $categories, 'suppliers' => $suppliers]);
     }
 
     public function store(): void {
@@ -59,6 +86,8 @@ class ProductsController extends Controller {
             'price' => (int)($_POST['price'] ?? 0),
             'expires_at' => $_POST['expires_at'] ?? null,
             'status' => $status,
+            'category_id' => isset($_POST['category_id']) && ctype_digit((string)$_POST['category_id']) ? (int)$_POST['category_id'] : null,
+            'supplier_id' => isset($_POST['supplier_id']) && ctype_digit((string)$_POST['supplier_id']) ? (int)$_POST['supplier_id'] : null,
         ];
         if ($d['sku'] === '' || $d['name'] === '') {
             Flash::error('SKU y Nombre son obligatorios', 'Datos incompletos');
@@ -116,7 +145,9 @@ class ProductsController extends Controller {
         if (!Auth::check()) { $this->redirect('/auth/login'); }
         if (!Auth::isAdmin()) { Flash::error('No tienes permisos para editar productos', 'Acceso denegado'); $this->redirect('/products'); return; }
         $p = (new Product())->find((int)$id);
-        $this->view('products/edit', ['p' => $p, 'title' => 'Editar producto']);
+        $categories = (new Category())->all();
+        $suppliers = (new Supplier())->all();
+        $this->view('products/edit', ['p' => $p, 'title' => 'Editar producto', 'categories' => $categories, 'suppliers' => $suppliers]);
     }
 
     public function update($id): void {
@@ -135,6 +166,8 @@ class ProductsController extends Controller {
             'price' => (int)($_POST['price'] ?? 0),
             'expires_at' => $_POST['expires_at'] ?? null,
             'status' => $status,
+            'category_id' => isset($_POST['category_id']) && ctype_digit((string)$_POST['category_id']) ? (int)$_POST['category_id'] : null,
+            'supplier_id' => isset($_POST['supplier_id']) && ctype_digit((string)$_POST['supplier_id']) ? (int)$_POST['supplier_id'] : null,
         ];
         if ($d['sku'] === '' || $d['name'] === '') {
             Flash::error('SKU y Nombre son obligatorios', 'Datos incompletos');
@@ -181,7 +214,7 @@ class ProductsController extends Controller {
         }
         (new Product())->update((int)$id, $d);
         // Audit: product updated (only changed fields of interest)
-        $keys = ['sku','name','description','image','stock','price','expires_at','status'];
+        $keys = ['sku','name','description','image','stock','price','expires_at','status','category_id','supplier_id'];
         $before = array_intersect_key($existing, array_flip($keys));
         $after = $d;
         // Normalize numeric strings

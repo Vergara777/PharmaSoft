@@ -75,7 +75,9 @@
         // If a confirmation is in progress, let it pass to avoid double prompts
         if (f.getAttribute('data-confirming') === '1') return;
         ev.preventDefault();
+        // Ensure any global busy overlay is dismissed immediately so the confirm can be clicked
         try { if (typeof window.bannerLoading === 'function') window.bannerLoading(false); } catch(_){ }
+        try { document.body.classList.remove('app-busy'); document.documentElement.style.overflow=''; } catch(_){ }
         // Mark confirming and temporarily skip global jQuery confirm
         f.setAttribute('data-confirming','1');
         f.setAttribute('data-skip-confirm','1');

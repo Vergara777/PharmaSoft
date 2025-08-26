@@ -8,6 +8,14 @@ define('BASE_URL', BASE_URL);
 
 define('APP_NAME', 'PharmaSoft');
 
+// Ensure all PHP date/time functions use Colombia timezone
+if (!ini_get('date.timezone')) {
+    @date_default_timezone_set('America/Bogota');
+} else {
+    // Force override to avoid server misconfiguration
+    @date_default_timezone_set('America/Bogota');
+}
+
 define('DB_HOST', '127.0.0.1');
 define('DB_PORT', 3306);
 define('DB_NAME', 'pharmasoft');

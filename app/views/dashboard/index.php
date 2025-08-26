@@ -11,7 +11,7 @@
     <div class="small-box bg-warning">
       <div class="inner"><h3><?= View::e($lowStock) ?></h3><p>Bajo stock (≤ <?= defined('LOW_STOCK_THRESHOLD') ? (int)LOW_STOCK_THRESHOLD : 5 ?>)</p></div>
       <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
-      <a href="<?= BASE_URL ?>/products?q=" class="small-box-footer">Inventario <i class="fas fa-arrow-circle-right"></i></a>
+      <a href="<?= BASE_URL ?>/products?stock=low" class="small-box-footer">Inventario <i class="fas fa-arrow-circle-right"></i></a>
     </div>
   </div>
   <div class="col-lg-3 col-6">
@@ -37,19 +37,50 @@
   </div>
   <div class="col-lg-3 col-6">
     <div class="small-box bg-primary">
-      <div class="inner"><h3>$<?= number_format((float)($monthSalesTotal ?? 0), 0, ',', '.') ?></h3><p>Ganancias del mes</p></div>
+      <div class="inner"><h3>$<?= number_format((float)($monthSalesTotal ?? 0), 0, ',', '.') ?></h3><p>Ventas del mes</p></div>
       <div class="icon"><i class="fas fa-calendar-alt"></i></div>
       <a href="<?= BASE_URL ?>/sales?from=<?= date('Y-m-01') ?>&to=<?= date('Y-m-t') ?>" class="small-box-footer">Ver detalle <i class="fas fa-arrow-circle-right"></i></a>
     </div>
   </div>
   <div class="col-lg-3 col-6">
     <div class="small-box bg-secondary">
-      <div class="inner"><h3>$<?= number_format((float)($yearSalesTotal ?? 0), 0, ',', '.') ?></h3><p>Ganancias del año</p></div>
+      <div class="inner"><h3>$<?= number_format((float)($yearSalesTotal ?? 0), 0, ',', '.') ?></h3><p>Ventas del año</p></div>
       <div class="icon"><i class="fas fa-calendar"></i></div>
       <a href="<?= BASE_URL ?>/sales?from=<?= date('Y-01-01') ?>&to=<?= date('Y-12-31') ?>" class="small-box-footer">Ver detalle <i class="fas fa-arrow-circle-right"></i></a>
     </div>
   </div>
+  <div class="col-lg-3 col-6">
+    <div class="small-box bg-teal">
+      <div class="inner"><h3>$<?= number_format((float)($monthProfit ?? 0), 0, ',', '.') ?></h3><p>Utilidad del mes</p></div>
+      <div class="icon"><i class="fas fa-chart-line"></i></div>
+      <a href="<?= BASE_URL ?>/sales?from=<?= date('Y-m-01') ?>&to=<?= date('Y-m-t') ?>" class="small-box-footer">Ver detalle <i class="fas fa-arrow-circle-right"></i></a>
+    </div>
+  </div>
+  <div class="col-lg-3 col-6">
+    <div class="small-box bg-navy">
+      <div class="inner"><h3>$<?= number_format((float)($yearProfit ?? 0), 0, ',', '.') ?></h3><p>Utilidad del año</p></div>
+      <div class="icon"><i class="fas fa-coins"></i></div>
+      <a href="<?= BASE_URL ?>/sales?from=<?= date('Y-01-01') ?>&to=<?= date('Y-12-31') ?>" class="small-box-footer">Ver detalle <i class="fas fa-arrow-circle-right"></i></a>
+    </div>
+  </div>
 </div>
+
+<?php if (!empty($expired) && (int)$expired > 0): ?>
+<div class="alert alert-danger d-flex justify-content-between align-items-center" role="alert">
+  <div>
+    <strong><?= View::e($expired) ?></strong> producto(s) vencido(s). Recomendado retirar del inventario.
+  </div>
+  <form method="post" action="<?= BASE_URL ?>/products/retire-expired" class="mb-0 js-confirmable" id="formRetireExpiredAlert" autocomplete="off"
+        data-confirm-title="Retirar vencidos"
+        data-confirm-text="¿Desea retirar todos los productos vencidos? Serán marcados como 'retirados' y su stock se pondrá en 0."
+        data-confirm-ok="Retirar"
+        data-confirm-cancel="Cancelar"
+        data-loading-text="Retirando vencidos...">
+    <input type="hidden" name="csrf" value="<?= View::e(App\Helpers\Security::csrfToken()) ?>">
+    <button type="submit" id="btnRetireExpiredAlert" class="btn btn-retire-expired btn-sm"><i class="fas fa-box-open mr-1"></i>Retirar vencidos</button>
+  </form>
+</div>
+<?php endif; ?>
 
 <!-- Floating Cart Button and Modal -->
 <button id="btnCartFloating" class="cart-fab" title="Ver carrito" aria-label="Ver carrito">
@@ -83,12 +114,13 @@
   <div class="ps-modal-backdrop" id="cartModalBackdrop"></div>
   </div>
 
-<div class="alert alert-secondary d-flex align-items-center" role="alert">
+<div id="invSummary" class="alert alert-secondary d-flex align-items-center" role="alert" style="display:none;">
   <i class="fas fa-bell mr-2 text-warning" aria-hidden="true"></i>
   <div class="mr-3">
     <strong>Resumen de inventario:</strong>
     <span class="badge badge-danger ml-2"><i class="fas fa-ban mr-1" aria-hidden="true"></i> Vencidos: <?= View::e($expired ?? 0) ?></span>
     <span class="badge badge-warning ml-2"><i class="fas fa-clock mr-1" aria-hidden="true"></i> Por vencer (30d): <?= View::e($expiringSoon ?? 0) ?></span>
+    <span class="badge badge-danger ml-2"><i class="fas fa-times-circle mr-1" aria-hidden="true"></i> Sin stock: <?= View::e($zeroStock ?? 0) ?></span>
     <span class="badge badge-warning ml-2"><i class="fas fa-exclamation-triangle mr-1" aria-hidden="true"></i> Bajo stock (≤ <?= defined('LOW_STOCK_THRESHOLD') ? (int)LOW_STOCK_THRESHOLD : 5 ?>): <?= View::e($lowStock ?? 0) ?></span>
     <?php $okInv = max(0, (int)$totalProducts - (int)($lowStock ?? 0)); ?>
     <span class="badge badge-success ml-2"><i class="fas fa-check mr-1" aria-hidden="true"></i> OK: <?= View::e($okInv) ?></span>
@@ -104,39 +136,21 @@
       <span class="badge badge-light inv-badge"><?= View::e($expired ?? 0) ?></span>
     </a>
     <!-- Tercero: Retirar vencidos (visible siempre; deshabilitado si no hay vencidos) -->
-    <form method="post" action="<?= BASE_URL ?>/products/retire-expired" class="mb-0" id="formRetireExpiredTop" autocomplete="off">
+    <form method="post" action="<?= BASE_URL ?>/products/retire-expired" class="mb-0 js-confirmable" id="formRetireExpiredTop" autocomplete="off"
+          data-confirm-title="Retirar vencidos"
+          data-confirm-text="¿Desea retirar todos los productos vencidos? Serán marcados como 'retirados' y su stock se pondrá en 0."
+          data-confirm-ok="Retirar"
+          data-confirm-cancel="Cancelar"
+          data-loading-text="Retirando vencidos...">
       <input type="hidden" name="csrf" value="<?= View::e(App\Helpers\Security::csrfToken()) ?>">
       <?php $hasExpired = (int)($expired ?? 0) > 0; ?>
-      <button type="submit" id="btnRetireExpiredTop" class="btn inv-btn <?= $hasExpired ? 'btn-outline-danger' : 'btn-outline-secondary' ?>" <?= $hasExpired ? '' : 'disabled title="No hay vencidos"' ?>>
+      <button type="submit" id="btnRetireExpiredTop" class="btn inv-btn btn-retire-expired <?= $hasExpired ? '' : 'disabled' ?>" <?= $hasExpired ? '' : 'disabled title="No hay vencidos"' ?>>
         <i class="fas fa-box-open inv-icon" aria-hidden="true"></i>
         <span class="inv-text">Retirar<br>vencidos</span>
       </button>
     </form>
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        var btnRetireExpiredTop = document.getElementById('btnRetireExpiredTop');
-        if (btnRetireExpiredTop) {
-          btnRetireExpiredTop.addEventListener('click', function(e) {
-            e.preventDefault();
-            var confirmText = '¿Retirar todos los productos vencidos? Se pondrán como retirados y stock = 0.';
-            if (typeof psConfirm === 'function') {
-              psConfirm({
-                title: 'Retirar vencidos',
-                text: confirmText,
-                confirm: function() {
-                  document.getElementById('formRetireExpiredTop').submit();
-                }
-              });
-            } else {
-              if (confirm(confirmText)) {
-                document.getElementById('formRetireExpiredTop').submit();
-              }
-            }
-          });
-        }
-      });
-    </script>
-    <a href="<?= BASE_URL ?>/products?q=" class="btn btn-warning inv-btn">
+    
+    <a href="<?= BASE_URL ?>/products?stock=low" class="btn btn-warning inv-btn">
       <i class="fas fa-exclamation-triangle inv-icon" aria-hidden="true"></i>
       <span class="inv-text">Bajo<br>stock</span>
       <span class="badge badge-light inv-badge"><?= View::e($lowStock ?? 0) ?></span>
@@ -148,7 +162,7 @@
   <div class="card">
   <div class="card-header d-flex justify-content-between align-items-center">
     <h3 class="card-title"><i class="fas fa-thermometer-quarter mr-2 text-warning" aria-hidden="true"></i> Stock bajo (Top 10)</h3>
-    <a href="<?= BASE_URL ?>/products?q=" class="btn btn-outline-warning btn-sm"><i class="fas fa-exclamation-triangle mr-1" aria-hidden="true"></i> Ir a productos</a>
+    <a href="<?= BASE_URL ?>/products?stock=low" class="btn btn-outline-warning btn-sm"><i class="fas fa-exclamation-triangle mr-1" aria-hidden="true"></i> Ir a productos</a>
   </div>
   <div class="table-responsive">
     <table class="table table-hover mb-0">
@@ -215,8 +229,22 @@
 <div class="row">
   <div class="col-12">
     <div class="card">
-      <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-fire mr-2 text-danger" aria-hidden="true"></i> Heatmap semanal (importe)</h3>
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title mb-0"><i class="fas fa-fire mr-2 text-danger" aria-hidden="true"></i> Heatmap semanal (importe)</h3>
+        <?php
+          // Mostrar fecha/hora colombiana
+          try {
+            $tzCo = new DateTimeZone('America/Bogota');
+            $nowCo = new DateTime('now', $tzCo);
+            $toCo = clone $nowCo;
+            $fromCo = (clone $nowCo)->modify('-6 days')->setTime(0,0,0);
+            $rangeText = $fromCo->format('d/m/Y') . ' - ' . $toCo->format('d/m/Y H:i');
+          } catch (\Throwable $e) { $rangeText = date('d/m/Y') . ' - ' . date('d/m/Y H:i'); }
+        ?>
+        <div class="text-muted small">
+          <i class="far fa-clock mr-1" aria-hidden="true"></i>
+          <span>Colombia: <?= View::e($rangeText) ?></span>
+        </div>
       </div>
       <div class="card-body">
         <?php
@@ -227,23 +255,23 @@
           }
         ?>
         <div class="table-responsive">
-          <table class="table table-sm mb-0">
+          <table class="table table-sm mb-0 heatmap-table">
             <thead>
               <tr>
-                <th style="min-width:48px">Día/Hora</th>
+                <th class="heatmap-sticky">Día/Hora</th>
                 <?php for ($h=0; $h<24; $h++): ?>
-                  <th class="text-center"><small><?= $h < 10 ? ('0'.$h) : $h ?></small></th>
+                  <th class="text-center heatmap-hour"><small><?= $h < 10 ? ('0'.$h) : $h ?></small></th>
                 <?php endfor; ?>
               </tr>
             </thead>
             <tbody>
               <?php for ($d=1; $d<=7; $d++): ?>
                 <tr>
-                  <th><?= View::e($labelsDow[$d]) ?></th>
+                  <th class="heatmap-sticky"><?= View::e($labelsDow[$d]) ?></th>
                   <?php for ($h=0; $h<24; $h++): ?>
-                    <?php $val = isset($heatmap[$d][$h]) ? (float)$heatmap[$d][$h] : 0.0; $ratio = ($maxHeat > 0 ? min(1.0, $val / $maxHeat) : 0.0); $alpha = 0.08 + $ratio * 0.6; ?>
-                    <td class="text-center" title="$<?= number_format($val,0,',','.') ?>"
-                        style="background: rgba(60,141,188, <?= number_format($alpha,2) ?>); color: <?= ($ratio > 0.5 ? '#fff' : '#000') ?>; min-width: 22px;">
+                    <?php $val = isset($heatmap[$d][$h]) ? (float)$heatmap[$d][$h] : 0.0; $ratio = ($maxHeat > 0 ? min(1.0, $val / $maxHeat) : 0.0); $alpha = 0.06 + $ratio * 0.72; ?>
+                    <td class="text-center heat-cell" title="$<?= number_format($val,0,',','.') ?> (<?= ($h<10?'0':'').$h ?>:00)"
+                        style="--heat-alpha: <?= number_format($alpha,2) ?>; color: <?= ($ratio > 0.55 ? '#fff' : '#1f2d3d') ?>;">
                       <small><?= $val > 0 ? '$'.number_format($val/1000,1,',','.').'k' : '—' ?></small>
                     </td>
                   <?php endfor; ?>
@@ -252,7 +280,14 @@
             </tbody>
           </table>
         </div>
-        <div class="text-muted small mt-2">Intensidad según total de ventas por hora en los últimos 7 días.</div>
+        <div class="d-flex align-items-center justify-content-between mt-2">
+          <div class="text-muted small">Intensidad según total de ventas por hora (últimos 7 días).</div>
+          <div class="heatmap-legend d-flex align-items-center">
+            <span class="mr-2 small text-muted">Bajo</span>
+            <div class="legend-bar"></div>
+            <span class="ml-2 small text-muted">Alto</span>
+          </div>
+        </div>
 
 <style>
   /* Scoped styles for dashboard tweaks */
@@ -273,6 +308,10 @@
   .inv-actions .btn-warning { background: #f39c12; border-color: #f39c12; color: #1f2d3d; }
   .inv-actions .btn-warning:hover { background: #d98c10; border-color: #d98c10; box-shadow: 0 4px 10px rgba(243,156,18,.25); }
   .inv-actions .inv-btn:focus { outline: none; box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); }
+  /* Custom style for 'Retirar vencidos' */
+  .btn-retire-expired { background: #ff5c5c; border-color: #ff5c5c; color: #111 !important; font-weight: 700; }
+  .btn-retire-expired:hover { background: #ff3d3d; border-color: #ff3d3d; color: #000 !important; box-shadow: 0 4px 12px rgba(255,61,61,.35); }
+  .btn-retire-expired.disabled, .btn-retire-expired:disabled { background: #f1b5b5; border-color: #f1b5b5; color: #666 !important; opacity: .85; }
   @media (max-width: 576px) {
     .inv-actions { width: 100%; }
     .inv-actions .inv-btn { flex: 1 1 auto; justify-content: center; height: auto; padding: 10px 12px; }
@@ -298,19 +337,16 @@
     .ps-modal-dialog { width: 96%; margin: 10px auto; max-height: calc(100vh - 20px); }
     .ps-modal-body { max-height: calc(100vh - 170px); }
   }
+  /* Heatmap styles */
+  .heatmap-table thead th { position: sticky; top: 0; background: #fff; z-index: 1; }
+  .heatmap-sticky { position: sticky; left: 0; background: #fff; z-index: 2; min-width: 64px; }
+  .heatmap-hour { min-width: 28px; }
+  .heat-cell { min-width: 28px; width: 28px; height: 28px; background: rgba(60,141,188, var(--heat-alpha, .08)); border-radius: 6px; transition: transform .08s ease, box-shadow .08s ease; }
+  .heat-cell:hover { transform: scale(1.08); box-shadow: 0 0 0 2px rgba(60,141,188,.25) inset; }
+  .heatmap-legend .legend-bar { width: 120px; height: 8px; border-radius: 999px; background: linear-gradient(90deg, rgba(60,141,188,.08) 0%, rgba(60,141,188,.78) 100%); }
 </style>
 
-<?php if (!empty($expired) && (int)$expired > 0): ?>
-<div class="alert alert-danger d-flex justify-content-between align-items-center" role="alert">
-  <div>
-    <strong><?= View::e($expired) ?></strong> producto(s) vencido(s). Recomendado retirar del inventario.
-  </div>
-  <form method="post" action="<?= BASE_URL ?>/products/retire-expired" class="mb-0" id="formRetireExpiredAlert" autocomplete="off">
-    <input type="hidden" name="csrf" value="<?= View::e(App\Helpers\Security::csrfToken()) ?>">
-    <button type="submit" id="btnRetireExpiredAlert" class="btn btn-outline-light btn-sm"><i class="fas fa-box-open mr-1"></i>Retirar vencidos</button>
-  </form>
-</div>
-<?php endif; ?>
+ 
 
 <script>
   // Cargar Chart.js (usamos CDN si no está ya cargado)
@@ -321,7 +357,20 @@
     s.async = true; document.head.appendChild(s);
   })();
   // Ensure notification triggers after layout scripts define notify()
-  document.addEventListener('DOMContentLoaded', function() {
+  (function(){
+    function revealInv(){
+      try {
+        var inv = document.getElementById('invSummary');
+        if (inv) { setTimeout(function(){ inv.style.display = ''; }, 2000); }
+      } catch(_){ }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', revealInv);
+    } else {
+      // DOMContentLoaded already fired; run immediately
+      revealInv();
+    }
+  })();
     try {
       var low = <?= (int)($lowStock ?? 0) ?>;
       var thr = <?= defined('LOW_STOCK_THRESHOLD') ? (int)LOW_STOCK_THRESHOLD : 5 ?>;
@@ -490,13 +539,31 @@
       var f = document.getElementById(idForm);
       var b = document.getElementById(idBtn);
       if (!f || !b) return;
+      // If the form uses the shared js-confirmable flow, do not bind custom logic to avoid double prompts
+      try { if (f.classList && f.classList.contains('js-confirmable')) return; } catch(_){ }
       f.addEventListener('submit', function(e){ e.preventDefault(); });
       b.addEventListener('click', function(e){
         if (b.disabled) return;
         e.preventDefault();
         var run = function(){
           try { b.disabled = true; b.classList.add('disabled'); } catch(_){ }
-          try { if (typeof window.bannerLoading === 'function') window.bannerLoading(false); } catch(_){ }
+          // Show processing/loading state while submitting
+          try {
+            if (typeof window.bannerLoading === 'function') {
+              window.bannerLoading(true, 'Retirando vencidos...');
+            } else {
+              // Minimal fallback overlay
+              var ov = document.getElementById('retireProcessingOverlay');
+              if (!ov) {
+                ov = document.createElement('div');
+                ov.id = 'retireProcessingOverlay';
+                ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:2000;';
+                ov.innerHTML = '<div style="background:#fff;padding:12px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-weight:700;display:inline-flex;align-items:center;gap:.6rem;"><span class="spinner-border spinner-border-sm text-danger" role="status" aria-hidden="true"></span><span>Retirando vencidos...</span></div>';
+                document.body.appendChild(ov);
+              }
+              ov.style.display = 'flex';
+            }
+          } catch(_){ }
           try {
             if (!f.method || f.method.toLowerCase() !== 'post') f.method = 'post';
             HTMLFormElement.prototype.submit.call(f);
@@ -507,11 +574,12 @@
         };
         // Use psConfirm if available; otherwise native confirm
         try {
+          var msg = '¿Desea retirar todos los productos vencidos? Serán marcados como "retirados" y su stock se pondrá en 0. Esta acción no afecta ventas ya registradas.';
           if (window.psConfirm) {
-            window.psConfirm({ title:'Retirar vencidos', text:'¿Retirar todos los productos vencidos? Se pondrán como retirados y stock = 0.', ok:'Retirar', cancel:'Cancelar' })
+            window.psConfirm({ title:'Retirar vencidos', text: msg, ok:'Retirar', cancel:'Cancelar' })
               .then(function(ok){ if (ok) run(); });
           } else {
-            if (window.confirm('¿Retirar todos los productos vencidos? Se pondrán como retirados y stock = 0.')) run();
+            if (window.confirm(msg)) run();
           }
         } catch(_){ run(); }
       });

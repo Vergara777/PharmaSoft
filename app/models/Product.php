@@ -7,10 +7,16 @@ use PDO;
 class Product extends Model {
     public function all(): array {
         // Include stock so sales create view can validate availability correctly
-        return $this->db->query("SELECT id, sku, name, description, image, stock, price, expires_at, status FROM products WHERE status = 'active' ORDER BY name ASC")->fetchAll();
+        return $this->db->query("SELECT id, sku, name, description, image, stock, price, expires_at, status, category_id, supplier_id FROM products WHERE status = 'active' ORDER BY name ASC")->fetchAll();
     }
-    public function search(string $q = ''): array {
+    public function search(string $q = '', ?int $categoryId = null): array {
         if ($q === '') {
+            if ($categoryId !== null) {
+                $st = $this->db->prepare("SELECT * FROM products WHERE status = 'active' AND category_id = :cid ORDER BY display_no ASC, id ASC");
+                $st->bindValue(':cid', $categoryId, PDO::PARAM_INT);
+                $st->execute();
+                return $st->fetchAll();
+            }
             $stmt = $this->db->query("SELECT * FROM products WHERE status = 'active' ORDER BY display_no ASC, id ASC");
             return $stmt->fetchAll();
         }
@@ -18,42 +24,169 @@ class Product extends Model {
         // If the query is a positive integer, prioritize exact ID match first
         if (ctype_digit($trim)) {
             $id = (int)$trim;
-            $stmt = $this->db->prepare("SELECT * FROM products WHERE id = :id AND status = 'active' ORDER BY id ASC");
+            $sql = "SELECT * FROM products WHERE id = :id AND status = 'active'" . ($categoryId !== null ? " AND category_id = :cid" : "") . " ORDER BY id ASC";
+            $stmt = $this->db->prepare($sql);
             $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+            if ($categoryId !== null) { $stmt->bindValue(':cid', $categoryId, PDO::PARAM_INT); }
             $stmt->execute();
             return $stmt->fetchAll();
         }
         // Default: search by name or SKU
         $like = "%$trim%";
-        $stmt = $this->db->prepare("SELECT * FROM products WHERE status = 'active' AND (name LIKE ? OR sku LIKE ?) ORDER BY display_no ASC, id ASC");
-        $stmt->execute([$like, $like]);
+        $sql = "SELECT * FROM products WHERE status = 'active' AND (name LIKE :like OR sku LIKE :like2)" . ($categoryId !== null ? " AND category_id = :cid" : "") . " ORDER BY display_no ASC, id ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':like', $like, PDO::PARAM_STR);
+        $stmt->bindValue(':like2', $like, PDO::PARAM_STR);
+        if ($categoryId !== null) { $stmt->bindValue(':cid', $categoryId, PDO::PARAM_INT); }
+        $stmt->execute();
         return $stmt->fetchAll();
     }
 
+    /**
+     * Filtered search with optional expiry and stock filters. Does not affect existing methods.
+     * - $expiryDays: if set (e.g., 30 or 60), include products with expires_at <= CURDATE() + INTERVAL $expiryDays DAY
+     * - $stockFilter: 'low' filters by stock > 0 AND stock <= $lowStockThreshold
+     */
+    public function searchFilteredPaginated(string $q, int $limit, int $offset, ?int $categoryId = null, ?int $expiryDays = null, ?string $stockFilter = null, ?int $lowStockThreshold = null): array {
+        if ($limit < 9) { $limit = 9; }
+        if ($offset < 0) { $offset = 0; }
+
+        $where = ["status = 'active'"];
+        $bind = [];
+
+        if ($categoryId !== null) { $where[] = 'category_id = :cid'; $bind[':cid'] = [$categoryId, PDO::PARAM_INT]; }
+        if ($expiryDays !== null && $expiryDays > 0) {
+            $where[] = 'expires_at IS NOT NULL AND expires_at <= DATE_ADD(CURDATE(), INTERVAL :ed DAY)';
+            $bind[':ed'] = [$expiryDays, PDO::PARAM_INT];
+        }
+        if ($stockFilter === 'low') {
+            $thr = ($lowStockThreshold !== null && $lowStockThreshold > 0) ? $lowStockThreshold : 5;
+            $where[] = 'stock > 0 AND stock <= :thr';
+            $bind[':thr'] = [$thr, PDO::PARAM_INT];
+        }
+
+        $whereSql = implode(' AND ', $where);
+
+        $trim = trim($q);
+        if ($trim === '') {
+            $sql = "SELECT * FROM products WHERE $whereSql ORDER BY display_no ASC, id ASC LIMIT :lim OFFSET :off";
+            $stmt = $this->db->prepare($sql);
+            foreach ($bind as $k => $v) { $stmt->bindValue($k, $v[0], $v[1]); }
+            $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':off', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetchAll();
+        }
+        if (ctype_digit($trim)) {
+            $id = (int)$trim;
+            $sql = "SELECT * FROM products WHERE id = :id AND $whereSql ORDER BY id ASC LIMIT :lim OFFSET :off";
+            $stmt = $this->db->prepare($sql);
+            $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+            foreach ($bind as $k => $v) { $stmt->bindValue($k, $v[0], $v[1]); }
+            $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':off', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetchAll();
+        }
+        $like = "%$trim%";
+        $sql = "SELECT * FROM products WHERE (name LIKE :like OR sku LIKE :like2) AND $whereSql ORDER BY display_no ASC, id ASC LIMIT :lim OFFSET :off";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':like', $like, PDO::PARAM_STR);
+        $stmt->bindValue(':like2', $like, PDO::PARAM_STR);
+        foreach ($bind as $k => $v) { $stmt->bindValue($k, $v[0], $v[1]); }
+        $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':off', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    /** Count for filtered search (same semantics as searchFilteredPaginated). */
+    public function countFiltered(string $q = '', ?int $categoryId = null, ?int $expiryDays = null, ?string $stockFilter = null, ?int $lowStockThreshold = null): int {
+        $where = ["status = 'active'"];
+        $bind = [];
+        if ($categoryId !== null) { $where[] = 'category_id = :cid'; $bind[':cid'] = [$categoryId, PDO::PARAM_INT]; }
+        if ($expiryDays !== null && $expiryDays > 0) {
+            $where[] = 'expires_at IS NOT NULL AND expires_at <= DATE_ADD(CURDATE(), INTERVAL :ed DAY)';
+            $bind[':ed'] = [$expiryDays, PDO::PARAM_INT];
+        }
+        if ($stockFilter === 'low') {
+            $thr = ($lowStockThreshold !== null && $lowStockThreshold > 0) ? $lowStockThreshold : 5;
+            $where[] = 'stock > 0 AND stock <= :thr';
+            $bind[':thr'] = [$thr, PDO::PARAM_INT];
+        }
+        $whereSql = implode(' AND ', $where);
+
+        $trim = trim($q);
+        if ($trim === '') {
+            $sql = "SELECT COUNT(*) FROM products WHERE $whereSql";
+            $stmt = $this->db->prepare($sql);
+            foreach ($bind as $k => $v) { $stmt->bindValue($k, $v[0], $v[1]); }
+            $stmt->execute();
+            return (int)$stmt->fetchColumn();
+        }
+        if (ctype_digit($trim)) {
+            $id = (int)$trim;
+            $sql = "SELECT COUNT(*) FROM products WHERE id = :id AND $whereSql";
+            $stmt = $this->db->prepare($sql);
+            $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+            foreach ($bind as $k => $v) { $stmt->bindValue($k, $v[0], $v[1]); }
+            $stmt->execute();
+            return (int)$stmt->fetchColumn();
+        }
+        $like = "%$trim%";
+        $sql = "SELECT COUNT(*) FROM products WHERE (name LIKE :like OR sku LIKE :like2) AND $whereSql";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':like', $like, PDO::PARAM_STR);
+        $stmt->bindValue(':like2', $like, PDO::PARAM_STR);
+        foreach ($bind as $k => $v) { $stmt->bindValue($k, $v[0], $v[1]); }
+        $stmt->execute();
+        return (int)$stmt->fetchColumn();
+    }
+
     /** Count active products matching search query (empty = all). */
-    public function countSearch(string $q = ''): int {
+    public function countSearch(string $q = '', ?int $categoryId = null): int {
         if ($q === '') {
+            if ($categoryId !== null) {
+                $st = $this->db->prepare("SELECT COUNT(*) FROM products WHERE status = 'active' AND category_id = :cid");
+                $st->bindValue(':cid', $categoryId, PDO::PARAM_INT);
+                $st->execute();
+                return (int)$st->fetchColumn();
+            }
             return (int)$this->db->query("SELECT COUNT(*) FROM products WHERE status = 'active'")->fetchColumn();
         }
         $trim = trim($q);
         if (ctype_digit($trim)) {
             $id = (int)$trim;
-            $stmt = $this->db->prepare("SELECT COUNT(*) FROM products WHERE id = :id AND status = 'active'");
+            $sql = "SELECT COUNT(*) FROM products WHERE id = :id AND status = 'active'" . ($categoryId !== null ? " AND category_id = :cid" : "");
+            $stmt = $this->db->prepare($sql);
             $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+            if ($categoryId !== null) { $stmt->bindValue(':cid', $categoryId, PDO::PARAM_INT); }
             $stmt->execute();
             return (int)$stmt->fetchColumn();
         }
         $like = "%$trim%";
-        $stmt = $this->db->prepare("SELECT COUNT(*) FROM products WHERE status = 'active' AND (name LIKE ? OR sku LIKE ?)");
-        $stmt->execute([$like, $like]);
+        $sql = "SELECT COUNT(*) FROM products WHERE status = 'active' AND (name LIKE :like OR sku LIKE :like2)" . ($categoryId !== null ? " AND category_id = :cid" : "");
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':like', $like, PDO::PARAM_STR);
+        $stmt->bindValue(':like2', $like, PDO::PARAM_STR);
+        if ($categoryId !== null) { $stmt->bindValue(':cid', $categoryId, PDO::PARAM_INT); }
+        $stmt->execute();
         return (int)$stmt->fetchColumn();
     }
 
     /** Paginated active product search. */
-    public function searchPaginated(string $q, int $limit, int $offset): array {
+    public function searchPaginated(string $q, int $limit, int $offset, ?int $categoryId = null): array {
         if ($limit < 9) { $limit = 9; }
         if ($offset < 0) { $offset = 0; }
         if ($q === '') {
+            if ($categoryId !== null) {
+                $stmt = $this->db->prepare("SELECT * FROM products WHERE status = 'active' AND category_id = :cid ORDER BY display_no ASC, id ASC LIMIT :lim OFFSET :off");
+                $stmt->bindValue(':cid', $categoryId, PDO::PARAM_INT);
+                $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
+                $stmt->bindValue(':off', $offset, PDO::PARAM_INT);
+                $stmt->execute();
+                return $stmt->fetchAll();
+            }
             $stmt = $this->db->prepare("SELECT * FROM products WHERE status = 'active' ORDER BY display_no ASC, id ASC LIMIT :lim OFFSET :off");
             $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
             $stmt->bindValue(':off', $offset, PDO::PARAM_INT);
@@ -63,8 +196,10 @@ class Product extends Model {
         $trim = trim($q);
         if (ctype_digit($trim)) {
             $id = (int)$trim;
-            $stmt = $this->db->prepare("SELECT * FROM products WHERE id = :id AND status = 'active' ORDER BY id ASC LIMIT :lim OFFSET :off");
+            $sql = "SELECT * FROM products WHERE id = :id AND status = 'active'" . ($categoryId !== null ? " AND category_id = :cid" : "") . " ORDER BY id ASC LIMIT :lim OFFSET :off";
+            $stmt = $this->db->prepare($sql);
             $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+            if ($categoryId !== null) { $stmt->bindValue(':cid', $categoryId, PDO::PARAM_INT); }
             $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
             $stmt->bindValue(':off', $offset, PDO::PARAM_INT);
             $stmt->execute();
@@ -72,9 +207,11 @@ class Product extends Model {
         }
         $like = "%$trim%";
         // Use only named parameters to avoid mixing positional and named placeholders
-        $stmt = $this->db->prepare("SELECT * FROM products WHERE status = 'active' AND (name LIKE :like OR sku LIKE :like2) ORDER BY display_no ASC, id ASC LIMIT :lim OFFSET :off");
+        $sql = "SELECT * FROM products WHERE status = 'active' AND (name LIKE :like OR sku LIKE :like2)" . ($categoryId !== null ? " AND category_id = :cid" : "") . " ORDER BY display_no ASC, id ASC LIMIT :lim OFFSET :off";
+        $stmt = $this->db->prepare($sql);
         $stmt->bindValue(':like', $like, PDO::PARAM_STR);
         $stmt->bindValue(':like2', $like, PDO::PARAM_STR);
+        if ($categoryId !== null) { $stmt->bindValue(':cid', $categoryId, PDO::PARAM_INT); }
         $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':off', $offset, PDO::PARAM_INT);
         $stmt->execute();
@@ -90,16 +227,16 @@ class Product extends Model {
     public function create(array $d): int {
         // Assign next display_no sequentially (compact numbering)
         $next = (int)$this->db->query('SELECT COALESCE(MAX(display_no),0)+1 FROM products')->fetchColumn();
-        $sql = 'INSERT INTO products (display_no, sku, name, description, image, stock, price, expires_at, status) VALUES (?,?,?,?,?,?,?,?,?)';
+        $sql = 'INSERT INTO products (display_no, sku, name, description, image, stock, price, expires_at, status, category_id, supplier_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)';
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$next,$d['sku'],$d['name'],$d['description'],$d['image'] ?? null,$d['stock'],$d['price'],$d['expires_at'],$d['status']]);
+        $stmt->execute([$next,$d['sku'],$d['name'],$d['description'],$d['image'] ?? null,$d['stock'],$d['price'],$d['expires_at'],$d['status'],($d['category_id'] ?? null),($d['supplier_id'] ?? null)]);
         return (int)$this->db->lastInsertId();
     }
 
     public function update(int $id, array $d): bool {
-        $sql = 'UPDATE products SET sku=?, name=?, description=?, image=?, stock=?, price=?, expires_at=?, status=? WHERE id = ?';
+        $sql = 'UPDATE products SET sku=?, name=?, description=?, image=?, stock=?, price=?, expires_at=?, status=?, category_id=?, supplier_id=? WHERE id = ?';
         $stmt = $this->db->prepare($sql);
-        return $stmt->execute([$d['sku'],$d['name'],$d['description'],$d['image'] ?? null,$d['stock'],$d['price'],$d['expires_at'],$d['status'],$id]);
+        return $stmt->execute([$d['sku'],$d['name'],$d['description'],$d['image'] ?? null,$d['stock'],$d['price'],$d['expires_at'],$d['status'],($d['category_id'] ?? null),($d['supplier_id'] ?? null),$id]);
     }
 
     public function delete(int $id): bool {
