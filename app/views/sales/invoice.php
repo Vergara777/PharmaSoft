@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= View::e($title ?? ('Factura electrónica #' . ($sale['id'] ?? ''))) ?></title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.7/dist/sweetalert2.min.css">
   <style>
     body { background: #f5f6f7; font-size: 14px; }
     .invoice-box { max-width: 960px; margin: 24px auto; background: #fff; padding: 28px; border: 1px solid #e9ecef; border-radius: 8px; }
@@ -114,6 +115,7 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.7/dist/sweetalert2.all.min.js"></script>
   <script>
     (function(){
       function safeFilename(name) {
@@ -164,5 +166,26 @@
       }
     })();
   </script>
+  <?php $___fl = \App\Helpers\Flash::popAll(); if (!empty($___fl)): ?>
+  <script>
+    (function(){
+      // Minimal top-right toast to match app behavior
+      const Toast = (window.Swal ? Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 4200,
+        timerProgressBar: true,
+        showCloseButton: true
+      }) : null);
+      const msgs = <?php echo json_encode($___fl, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+      if (Toast && Array.isArray(msgs)) {
+        msgs.forEach(function(m){
+          Toast.fire({ icon: m.type || 'info', title: m.title || '', text: m.message || '' });
+        });
+      }
+    })();
+  </script>
+  <?php endif; ?>
 </body>
 </html>

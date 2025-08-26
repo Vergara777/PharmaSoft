@@ -9,6 +9,7 @@
     .products-card .badge-warning { background: #ffb300; color: #111; box-shadow: 0 0 6px rgba(255, 179, 0, .55); }
     .products-card .badge-success { background: #00c853; color: #fff; box-shadow: 0 0 6px rgba(0, 200, 83, .45); }
     .products-card .badge-secondary { background: #5a6268; color: #fff; box-shadow: 0 0 6px rgba(90, 98, 104, .45); }
+    .products-card .badge-primary { background: #3b82f6; color: #fff; box-shadow: 0 0 6px rgba(59, 130, 246, .45); }
     /* Orange add-to-cart button */
     .btn-add-cart-orange { background: #f59e0b; border: 1px solid #d97706; color: #111; font-weight: 700; }
     .btn-add-cart-orange:hover { background: #ea8a07; border-color: #c26a05; color: #111; }
@@ -24,28 +25,49 @@
     .ps-empty-state .box { text-align: center; max-width: 680px; }
     .ps-empty-state .title { font-weight: 900; font-size: 1.25rem; color: #111827; }
     .ps-empty-state .desc { margin-top: 6px; font-weight: 700; }
-    /* Full-width table inside card and balanced name column */
-    .products-card table { width: 100%; margin: 0; }
+    /* Full-width table, tighter rows, and vertical centering */
+    .products-card table { width: 100%; margin: 0; table-layout: auto; }
+    .products-card table thead th,
+    .products-card table tbody td{ vertical-align: middle; text-align: center; padding-top: .55rem; padding-bottom: .55rem; }
+    /* Column width balance (desktop) */
+    .products-card table thead th:nth-child(1),
+    .products-card table tbody td:nth-child(1){ width: 4%; min-width: 36px; }
+    .products-card table thead th:nth-child(2),
+    .products-card table tbody td:nth-child(2){ width: 10%; }
     .products-card table thead th:nth-child(3),
-    .products-card table tbody td:nth-child(3){ min-width: 220px; width: 29%; }
-    /* Center align for Name column */
+    .products-card table tbody td:nth-child(3){ min-width: 220px; width: 28%; }
+    .products-card table thead th:nth-child(4),
+    .products-card table tbody td:nth-child(4){ width: 14%; }
+    .products-card table thead th:nth-child(5),
+    .products-card table tbody td:nth-child(5){ width: 10%; }
+    .products-card table thead th:nth-child(6),
+    .products-card table tbody td:nth-child(6){ width: 8%; }
+    .products-card table thead th:nth-child(7),
+    .products-card table tbody td:nth-child(7){ width: 14%; }
+    .products-card table thead th:nth-child(8),
+    .products-card table tbody td:nth-child(8){ width: 8%; }
+    /* Name cell content centered inside the cell (original behavior) */
+    .products-card table tbody tr{ height: 112px; }
     .products-card table thead th:nth-child(3){ text-align: center; }
-    .products-card table tbody td:nth-child(3){ display: flex; align-items: center; justify-content: center; }
-    .products-card table tbody td:nth-child(3) img{ margin-right: 10px; }
-    .products-card table tbody td:nth-child(3) .name-text{ font-weight:600; word-break: break-word; text-align: center; }
+    .products-card table tbody td:nth-child(3){ display: flex; align-items: center; justify-content: center; gap: 10px; padding-top: 42px; padding-bottom: 0; }
+    .products-card table tbody td:nth-child(3) img{ margin: 0; width: 56px; height: 56px; object-fit: cover; border-radius: 50%; border: 1px solid #ddd; }
+    .products-card table tbody td:nth-child(3) .name-text{
+      font-weight:600; word-break: break-word; text-align: center; line-height: 1.0;
+      display: flex; align-items: center; height: 56px; /* match avatar height */
+    }
     /* Uniform action buttons (Actions column) */
     .products-card table thead th:last-child,
-    .products-card table tbody td:last-child { min-width: 180px; width: 180px; }
+    .products-card table tbody td:last-child { min-width: 200px; width: 200px; }
     .products-card table tbody td:last-child .btn {
       width: 100%;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       white-space: nowrap;
-      padding: 0.35rem 0.6rem;
-      min-height: 34px; /* a bit shorter */
-      font-size: .85rem; /* slightly smaller */
-      margin-bottom: 6px;
+      padding: 0.3rem 0.55rem;
+      min-height: 32px; /* tighter */
+      font-size: .84rem;
+      margin-bottom: 4px; /* less vertical space */
     }
     .products-card table tbody td:last-child .btn i { margin-right: .35rem; }
   </style>
@@ -289,9 +311,13 @@
                 —
               <?php else: ?>
                 <?php if ($days < 0): ?>
-                  <?= View::e($p['expires_at']) ?> (Vencido)
+                  <span class="badge badge-danger" title="Producto vencido"><?= View::e($p['expires_at']) ?> (Vencido, −<?= abs($days) ?> d)</span>
+                <?php elseif ($days <= 30): ?>
+                  <span class="badge badge-warning" title="Por vencer"><?= View::e($p['expires_at']) ?> (Advertencia, <?= $days ?> d)</span>
                 <?php else: ?>
-                  <?= View::e($p['expires_at']) ?> (<?= $days ?> d)
+                  <span class="badge badge-primary" title="Fecha válida">
+                    <?= View::e($p['expires_at']) ?> (<?= $days ?> d)
+                  </span>
                 <?php endif; ?>
               <?php endif; ?>
             </td>
@@ -489,6 +515,52 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function(){
+    // Loading banner (centered, blocks UI) used when agregando al carrito
+    if (!window.loadingBar) {
+      window.loadingBar = {
+        start: function(msg){
+          msg = msg || 'Cargando...';
+          try {
+            if (window.Swal && typeof Swal.fire === 'function') {
+              Swal.fire({
+                title: msg,
+                html: '<div style="font-weight:600;margin-top:6px;">Agregando producto al carrito</div>',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                backdrop: true,
+                didOpen: function(){ try { Swal.showLoading(); } catch(_){} }
+              });
+              return;
+            }
+          } catch(_){ }
+          // Fallback overlay
+          try {
+            var ov = document.getElementById('ps-loading-overlay');
+            if (ov) return;
+            ov = document.createElement('div');
+            ov.id = 'ps-loading-overlay';
+            ov.style.position = 'fixed'; ov.style.inset = '0'; ov.style.zIndex = '2000';
+            ov.style.background = 'rgba(0,0,0,.45)'; ov.style.display = 'flex'; ov.style.alignItems = 'center'; ov.style.justifyContent = 'center';
+            var box = document.createElement('div');
+            box.style.background = '#fff'; box.style.borderRadius = '10px'; box.style.padding = '18px 22px'; box.style.boxShadow = '0 12px 28px rgba(0,0,0,.25)';
+            box.style.fontWeight = '700'; box.style.color = '#111'; box.textContent = msg + ' · Agregando producto al carrito';
+            ov.appendChild(box);
+            document.body.appendChild(ov);
+            // Trap interaction
+            function stop(e){ e.preventDefault(); e.stopPropagation(); return false; }
+            ov.addEventListener('click', stop, true);
+            document.addEventListener('keydown', stop, true);
+            ov.dataset.trap = '1';
+          } catch(_){}
+        },
+        stop: function(){
+          try { if (window.Swal && typeof Swal.close === 'function') return Swal.close(); } catch(_){ }
+          var ov = document.getElementById('ps-loading-overlay');
+          if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+        }
+      };
+    }
     var IS_ADMIN = <?= $isAdmin ? 'true' : 'false' ?>;
     // If global cart is present in layout, hide/remove local cart UI to avoid duplicates
     try {
@@ -609,11 +681,17 @@
       el = m.querySelector('#pd-sku'); if (el) el.textContent = btn.getAttribute('data-sku') || '—';
       el = m.querySelector('#pd-name'); if (el) el.textContent = btn.getAttribute('data-name') || '—';
       el = m.querySelector('#pd-price'); if (el) el.textContent = fmtCurrency(btn.getAttribute('data-price'));
-      el = m.querySelector('#pd-stock'); if (el) el.textContent = btn.getAttribute('data-stock') || '0';
+      el = m.querySelector('#pd-stock'); if (el) { el.textContent = btn.getAttribute('data-stock') || '0'; el.className = ''; }
       var exp = btn.getAttribute('data-expires_at') || '';
-      el = m.querySelector('#pd-exp'); if (el) el.textContent = exp !== '' ? exp : '—';
+      el = m.querySelector('#pd-exp'); if (el) { el.textContent = exp !== '' ? exp : '—'; el.className = ''; }
       var st = btn.getAttribute('data-status') || '';
-      el = m.querySelector('#pd-status'); if (el) el.textContent = st ? (st.toLowerCase()==='active'?'Activo':(st.toLowerCase()==='retired'?'Retirado':st)) : '—';
+      el = m.querySelector('#pd-status'); if (el) {
+        var stLower = (st||'').toLowerCase();
+        var label = stLower==='active' || stLower==='activo' ? 'Activo' : 'Inactivo';
+        el.textContent = label;
+        el.classList.remove('badge','badge-success','badge-danger','badge-secondary');
+        el.classList.add('badge', (label==='Activo' ? 'badge-success' : 'badge-danger'));
+      }
       var desc = btn.getAttribute('data-description') || '';
       el = m.querySelector('#pd-desc'); if (el) el.textContent = desc !== '' ? desc : 'Sin descripción';
       var cat = btn.getAttribute('data-category') || '';
@@ -638,19 +716,58 @@
       try {
         var stock = parseInt(btn.getAttribute('data-stock')||'0',10) || 0;
         var sd = parseInt(btn.getAttribute('data-stkdanger')||'20',10) || 20;
-        var sw = parseInt(btn.getAttribute('data-stkwarn')||'60',10) || 60;
+        var swCfg = parseInt(btn.getAttribute('data-stkwarn')||'60',10) || 60;
+        var sw = Math.max(sd, swCfg); // warning hasta STOCK_WARN (por defecto 60)
         var days = null;
         if (exp) {
           var ts = Date.parse(exp);
           if (!isNaN(ts)) { days = Math.floor((ts - Date.now()) / 86400000); }
         }
-        var level = 'success';
-        if ((days !== null && days < 0) || stock <= sd) level = 'danger';
-        else if ((days !== null && days <= 30) || stock <= sw) level = 'warning';
+        // Nivel de stock y de caducidad (se toma el peor para el tema del modal)
+        var levelStock = 'success';
+        if (stock <= sd) levelStock = 'danger';
+        else if (stock <= sw) levelStock = 'warning';
+        else levelStock = 'success'; // > STOCK_WARN
+        var levelExp = 'success';
+        if (typeof days === 'number') {
+          if (days < 0) levelExp = 'danger';
+          else if (days <= 30) levelExp = 'warning';
+        }
+        var level = (levelStock === 'danger' || levelExp === 'danger') ? 'danger'
+                  : ((levelStock === 'warning' || levelExp === 'warning') ? 'warning' : 'success');
         var content = m.querySelector('#pd-content');
         if (content) {
           content.classList.remove('pd-theme-danger','pd-theme-warning','pd-theme-success');
           content.classList.add('pd-theme-' + level);
+        }
+        // Pintar el campo de Stock (badge)
+        var stockEl = m.querySelector('#pd-stock');
+        if (stockEl) {
+          stockEl.classList.remove('badge','badge-danger','badge-warning','badge-success');
+          stockEl.classList.add('badge', 'badge-' + levelStock);
+          var label = (levelStock==='danger') ? 'Muy bajo' : (levelStock==='warning' ? 'Bajo' : 'Óptimo');
+          stockEl.textContent = String(stock) + ' (' + label + ')';
+          stockEl.setAttribute('title', 'Stock actual');
+        }
+        // Pintar caducidad como badge si aplica (con días restantes o vencidos)
+        var expEl = m.querySelector('#pd-exp');
+        if (expEl) {
+          expEl.classList.remove('badge','badge-danger','badge-warning','badge-success','badge-primary');
+          if (typeof days === 'number') {
+            if (days < 0) {
+              expEl.classList.add('badge','badge-danger');
+              expEl.textContent = (exp || '') + ' (Vencido, −' + Math.abs(days) + ' d)';
+            } else if (days <= 30) {
+              expEl.classList.add('badge','badge-warning');
+              expEl.textContent = (exp || '') + ' (Advertencia, ' + days + ' d)';
+            } else {
+              // OK: azulito con días
+              expEl.classList.add('badge','badge-primary');
+              expEl.textContent = (exp || '—') + ' (' + days + ' d)';
+            }
+          } else {
+            expEl.textContent = '—';
+          }
         }
         var hint = m.querySelector('#pd-hint');
         if (hint) {
@@ -973,8 +1090,17 @@
         var btns = mBody ? mBody.querySelectorAll('.btnRemoveItem') : [];
         if (btns && btns.forEach){ btns.forEach(function(b){ b.addEventListener('click', function(){ var tr=b.closest('tr'); var idx = tr ? parseInt(tr.getAttribute('data-i')||'-1',10) : -1; var arr = read(); if (idx>=0 && idx < arr.length){ arr.splice(idx,1); write(arr); render(); } }); }); }
       }
-      function open(){ if (!modal) return; render(); modal.style.display='block'; document.body.style.overflow='hidden'; }
-      function close(){ if (!modal) return; modal.style.display='none'; document.body.style.overflow=''; }
+      function open(){ if (!modal) return; try{ if (window.loadingBar) loadingBar.start('Cargando...'); }catch(_){} render(); modal.style.display='block'; document.body.style.overflow='hidden'; setTimeout(function(){ try{ if (window.loadingBar) loadingBar.stop(); }catch(_){ } }, 400); try{ if (window.notify) notify({ icon:'info', title:'Carrito abierto', timer: 3500, position:'top-end', toast:true }); }catch(_){ } }
+      function close(){
+        if (!modal) return;
+        try{ if (window.loadingBar) loadingBar.start('Cerrando...'); }catch(_){ }
+        setTimeout(function(){
+          modal.style.display='none';
+          document.body.style.overflow='';
+          try{ if (window.loadingBar) loadingBar.stop(); }catch(_){ }
+          try{ if (window.notify) notify({ icon:'info', title:'Carrito cerrado', timer: 3500, position:'top-end', toast:true }); }catch(_){ }
+        }, 400);
+      }
       if (fab) fab.addEventListener('click', function(e){ e.preventDefault(); open(); });
       if (mClose) mClose.addEventListener('click', function(){ close(); });
       if (mBackdrop) mBackdrop.addEventListener('click', function(e){ if (e.target===mBackdrop) close(); });
@@ -988,15 +1114,33 @@
               showCancelButton: true,
               confirmButtonText: 'Sí, vaciar',
               cancelButtonText: 'No'
-            }).then(function(res){ if (res && res.isConfirmed) { write([]); render(); } });
+            }).then(function(res){ if (res && res.isConfirmed) { try{ if (window.loadingBar) loadingBar.start('Cargando...'); }catch(_){ } setTimeout(function(){ write([]); render(); try{ if (window.loadingBar) loadingBar.stop(); }catch(_){ } }, 500); } });
           }
           if (window.psConfirm) {
             return window.psConfirm({ title:'Vaciar carrito', text:'¿Desea vaciar el borrador del carrito?', ok:'Sí', cancel:'No' })
-              .then(function(ok){ if (ok) { write([]); render(); } });
+              .then(function(ok){ if (ok) { try{ if (window.loadingBar) loadingBar.start('Cargando...'); }catch(_){ } setTimeout(function(){ write([]); render(); try{ if (window.loadingBar) loadingBar.stop(); }catch(_){ } }, 500); } });
           }
         } catch(_){ }
-        if (confirm('¿Desea vaciar el borrador del carrito?')) { write([]); render(); }
+        if (confirm('¿Desea vaciar el borrador del carrito?')) { try{ if (window.loadingBar) loadingBar.start('Cargando...'); }catch(_){ } setTimeout(function(){ write([]); render(); try{ if (window.loadingBar) loadingBar.stop(); }catch(_){ } }, 500); }
       });
+      // Intercept checkout to show loading before navigating
+      (function(){
+        try {
+          var footer = document.getElementById('cartModalFooter');
+          if (footer) {
+            var a = footer.querySelector('a[href$="/sales/create"]');
+            if (a) {
+              a.addEventListener('click', function(e){
+                try{ if (window.loadingBar) loadingBar.start('Cargando...'); }catch(_){ }
+                // allow normal navigation shortly after showing loading
+                setTimeout(function(){ try{ if (window.loadingBar) loadingBar.stop(); }catch(_){ } window.location.href = a.href; }, 350);
+                e.preventDefault();
+              });
+            }
+          }
+        } catch(_){ }
+      })();
+
       // expose for live refresh
       window.psCart = window.psCart || {};
       window.psCart.refresh = render;

@@ -133,7 +133,7 @@ class DashboardController extends Controller {
         // Optional debug: force showing counts
         $debugExpiry = isset($_GET['debug_expiry']) && $_GET['debug_expiry'] == '1';
         if ($debugExpiry) {
-            Flash::info('Debug: vencidos='.$expired.' | por vencer='.$expiringSoon, 'Debug Expiración', 6000);
+            Flash::info('Debug: vencidos='.$expired.' | por vencer='.$expiringSoon, 'Debug Expiración', 6000, 'top-end');
         }
         // Notify expired products
         if ($expired > 0) {
@@ -146,7 +146,7 @@ class DashboardController extends Controller {
             }, $expiredList ?: []);
             $extra = $expired > count($items) ? (' y +' . ($expired - count($items)) . ' más') : '';
             $msg = 'Tienes ' . $expired . ' producto(s) VENCIDO(s).' . (empty($items) ? '' : (' Ej: ' . implode(', ', $items))) . $extra;
-            Flash::warning($msg, 'Alerta de Vencimiento');
+            Flash::warning($msg, 'Alerta de Vencimiento', 4000, 'top-end');
         }
         // Notify expiring soon products
         if ($expiringSoon > 0) {
@@ -159,7 +159,7 @@ class DashboardController extends Controller {
             }, $soonList ?: []);
             $extra2 = $expiringSoon > count($items2) ? (' y +' . ($expiringSoon - count($items2)) . ' más') : '';
             $msg2 = 'Tienes ' . $expiringSoon . ' producto(s) por vencer (≤ 30 días).' . (empty($items2) ? '' : (' Ej: ' . implode(', ', $items2))) . $extra2;
-            Flash::info($msg2, 'Por vencer');
+            Flash::info($msg2, 'Por vencer', 4000, 'top-end');
         }
         // Notify out-of-stock (sin stock)
         if ($zeroStock > 0) {
@@ -170,7 +170,7 @@ class DashboardController extends Controller {
             }, $zeroStockList ?: []);
             $extra3 = $zeroStock > count($items3) ? (' y +' . ($zeroStock - count($items3)) . ' más') : '';
             $msg3 = 'Tienes ' . $zeroStock . ' producto(s) SIN STOCK.' . (empty($items3) ? '' : (' Ej: ' . implode(', ', $items3))) . $extra3;
-            Flash::warning($msg3, 'Inventario agotado');
+            Flash::warning($msg3, 'Inventario agotado', 4000, 'top-end');
         }
         // Notify low stock (se está acabando) excluding zeros
         if ($lowPositiveCount > 0) {
@@ -182,7 +182,7 @@ class DashboardController extends Controller {
             }, $lowPositiveList ?: []);
             $extra4 = $lowPositiveCount > count($items4) ? (' y +' . ($lowPositiveCount - count($items4)) . ' más') : '';
             $msg4 = 'Productos con stock bajo (≤ ' . $thr . '): ' . $lowPositiveCount . '.' . (empty($items4) ? '' : (' Ej: ' . implode(', ', $items4))) . $extra4;
-            Flash::info($msg4, 'Stock bajo');
+            Flash::info($msg4, 'Stock bajo', 4000, 'top-end');
         }
         $this->view('dashboard/index', compact('totalProducts','lowStock','expiring','expired','expiringSoon','todaySalesCount','todaySalesTotal','monthSalesTotal','yearSalesTotal','monthProfit','yearProfit','todaySales','lowStockList','topProducts','heatmap','zeroStock','zeroStockList') + ['title' => 'Dashboard']);
     }

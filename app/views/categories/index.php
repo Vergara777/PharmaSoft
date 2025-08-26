@@ -46,7 +46,7 @@
               <td><?= View::e($c['name'] ?? '') ?></td>
               <td class="text-right">
                 <a class="btn btn-sm btn-outline-secondary" href="<?= BASE_URL ?>/categories/edit/<?= (int)$c['id'] ?>"><i class="fas fa-edit"></i></a>
-                <form method="post" action="<?= BASE_URL ?>/categories/delete/<?= (int)$c['id'] ?>" style="display:inline;" onsubmit="return window.confirmAction ? window.confirmAction({title:'Eliminar categoría', text:'Esta acción no se puede deshacer'}) : confirm('¿Eliminar categoría?');">
+                <form method="post" action="<?= BASE_URL ?>/categories/delete/<?= (int)$c['id'] ?>" style="display:inline;" class="js-confirmable" data-confirm-title="Eliminar categoría" data-confirm-text="Esta acción no se puede deshacer" data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
                   <input type="hidden" name="csrf" value="<?= Security::csrfToken() ?>">
                   <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
                 </form>

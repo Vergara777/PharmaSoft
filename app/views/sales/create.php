@@ -61,6 +61,14 @@
         #btnAddItem { height:38px; padding:.375rem .75rem; line-height:1.5; margin-top:0; }
         /* Fine alignment: raise qty, price and button a bit more */
         #pickQty, #pickPrice, #btnAddItem, .input-group-prepend .input-group-text { transform: translateY(-5px); }
+        /* Keep category + product selectors on one line and aligned neatly */
+        .form-row.pickers { display:flex; flex-wrap: nowrap; align-items: flex-start; gap: 12px; overflow: visible; }
+        .form-row.pickers .pick-col { display:flex; flex-direction: column; }
+        .form-row.pickers .pick-col select.form-control { height: 38px; }
+        .form-row.pickers .pick-col .choices__inner { min-height: 38px; }
+        .form-row.pickers .pick-col label { margin-bottom: .25rem !important; }
+        /* Raise the category column using margin (no stacking context) */
+        .form-row.pickers .pick-col-cat { margin-top: -56px; }
       }
       /* Category filter styles */
       #catFilter + .choices { margin-top: 0; }
@@ -68,7 +76,18 @@
       .choices { margin-bottom: 0; }
       .choices__inner { min-height: 38px; padding: 0.25rem 0.5rem; display: flex; align-items: center; }
       .choices__list--single .choices__item { line-height: 1.5; }
-      .choices[data-type*=select-one] .choices__input { display: none; }
+      /* SHOW the search input for select-one to help users find products */
+      .choices[data-type*=select-one] .choices__input { display: block; width: 100%; padding: .375rem .5rem; margin: 0; min-height: auto; }
+      .choices__input { font-size: .95rem; }
+      /* Make dropdown scroll internally, not the page */
+      .choices__list--dropdown { max-height: 320px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+      .choices.is-open .choices__list--dropdown { max-height: 320px; overflow-y: auto; }
+      /* Only the outer dropdown should scroll to avoid double scrollbars */
+      .choices__list--dropdown .choices__list { position: static; max-height: none; overflow: visible; }
+      /* Ensure dropdown overlays neighbors and is not hidden */
+      .choices { position: relative; }
+      .choices.is-open { z-index: 1200; }
+      .choices__list--dropdown { z-index: 1210; }
       /* Align labels spacing */
       .form-group > label.mb-1 { margin-bottom: .25rem !important; }
       /* Centered loading overlay */
@@ -123,19 +142,21 @@
     <?php endif; ?>
     <form method="post" action="<?= BASE_URL ?>/sales/store" data-loading-text="Guardando venta..." id="cartForm">
       <input type="hidden" name="csrf" value="<?= Security::csrfToken() ?>">
-      <div class="form-row align-items-center">
-        <div class="form-group col-12 col-md-4 col-lg-4 mb-0">
+      <div class="form-row align-items-center pickers">
+        <div class="form-group col-12 col-md-4 col-lg-4 mb-0 pick-col pick-col-cat">
           <label class="mb-1">Categoría</label>
+          <small class="form-text text-muted mb-1">Aquí podrá elegir su categoría</small>
           <select id="catFilter" class="form-control">
-            <option value="">Categorías</option>
+            <option value="">Seleccionar categoría</option>
             <option value="all">Todas</option>
             <?php if (!empty($categories ?? [])): foreach (($categories ?? []) as $c): ?>
               <option value="<?= (int)($c['id'] ?? 0) ?>"><?= View::e($c['name'] ?? '') ?></option>
             <?php endforeach; endif; ?>
           </select>
         </div>
-        <div class="form-group col-12 col-md-8 col-lg-8 mb-0">
+        <div class="form-group col-12 col-md-8 col-lg-8 mb-0 pick-col pick-col-prod">
           <label class="mb-1">Producto</label>
+          <small class="form-text text-muted mb-1">Busca por nombre o SKU. Escribe aquí el nombre del producto…</small>
           <select name="product_pick" class="form-control">
             <option value="">-- Selecciona --</option>
             <?php
@@ -169,6 +190,9 @@
             </div>
           </div>
         </div>
+      </div>
+      <!-- Second row: qty, price and add button -->
+      <div class="form-row align-items-center mt-2">
         <div class="form-group col-6 col-md-2 col-lg-2 mb-0">
           <label class="mb-1">Cantidad</label>
           <input type="number" min="1" step="1" id="pickQty" value="1" class="form-control">
@@ -877,6 +901,10 @@
         try { sel.innerHTML = ''; if (placeholderOpt) sel.appendChild(placeholderOpt); } catch(_){ }
         __choicesInst = new Choices(sel, {
           searchEnabled: true,
+          searchPlaceholderValue: 'Escribe el nombre del producto…',
+          placeholderValue: '-- Busca por nombre o SKU --',
+          noResultsText: 'Sin coincidencias',
+          noChoicesText: 'No hay productos',
           shouldSort: false,
           itemSelectText: '',
           removeItemButton: false,
@@ -913,6 +941,22 @@
       } catch(_){ /* ignore */ }
     }
     sel && sel.addEventListener('change', updatePickerFromSelection);
+
+    // Enhance category selector with Choices (searchable)
+    var __choicesCat = null;
+    if (catSel && window.Choices) {
+      try {
+        __choicesCat = new Choices(catSel, {
+          searchEnabled: true,
+          searchPlaceholderValue: 'Escriba la categoría…',
+          placeholderValue: 'Seleccionar categoría',
+          itemSelectText: '',
+          shouldSort: true,
+          removeItemButton: false,
+          allowHTML: true
+        });
+      } catch(_){ }
+    }
     // Category filter -> filter choices
     function applyCategoryFilter(){
       if (!__choicesInst) return;

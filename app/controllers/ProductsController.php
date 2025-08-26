@@ -90,15 +90,15 @@ class ProductsController extends Controller {
             'supplier_id' => isset($_POST['supplier_id']) && ctype_digit((string)$_POST['supplier_id']) ? (int)$_POST['supplier_id'] : null,
         ];
         if ($d['sku'] === '' || $d['name'] === '') {
-            Flash::error('SKU y Nombre son obligatorios', 'Datos incompletos');
+            Flash::error('SKU y Nombre son obligatorios', 'Datos incompletos', 6000, 'top-end');
             $this->redirect('/products/create');
         }
         if ($d['stock'] < 0) {
-            Flash::error('El stock no puede ser negativo', 'Valor inválido');
+            Flash::error('El stock no puede ser negativo', 'Valor inválido', 6000, 'top-end');
             $this->redirect('/products/create');
         }
         if ($d['price'] < 0) {
-            Flash::error('El precio no puede ser negativo', 'Valor inválido');
+            Flash::error('El precio no puede ser negativo', 'Valor inválido', 6000, 'top-end');
             $this->redirect('/products/create');
         }
         // Handle image upload (optional)
@@ -111,11 +111,11 @@ class ProductsController extends Controller {
                 $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
                 $allowed = ['jpg','jpeg','png','gif','webp'];
                 if (!in_array($ext, $allowed, true)) {
-                    Flash::error('Formato de imagen no permitido. Usa JPG, PNG, GIF o WEBP.', 'Archivo inválido');
+                    Flash::error('Formato de imagen no permitido. Usa JPG, PNG, GIF o WEBP.', 'Archivo inválido', 6000, 'top-end');
                     $this->redirect('/products/create');
                 }
                 if ($size > 5 * 1024 * 1024) { // 5MB
-                    Flash::error('La imagen supera el tamaño máximo de 5MB.', 'Archivo demasiado grande');
+                    Flash::error('La imagen supera el tamaño máximo de 5MB.', 'Archivo demasiado grande', 6000, 'top-end');
                     $this->redirect('/products/create');
                 }
                 $destDir = __DIR__ . '/../../public/uploads';
@@ -123,12 +123,12 @@ class ProductsController extends Controller {
                 $newName = 'prod_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
                 $destPath = $destDir . DIRECTORY_SEPARATOR . $newName;
                 if (!move_uploaded_file($tmp, $destPath)) {
-                    Flash::error('No se pudo guardar la imagen en el servidor.', 'Error de carga');
+                    Flash::error('No se pudo guardar la imagen en el servidor.', 'Error de carga', 6000, 'top-end');
                     $this->redirect('/products/create');
                 }
                 $d['image'] = $newName;
             } elseif ($err !== UPLOAD_ERR_NO_FILE) {
-                Flash::error('Error al subir la imagen (código ' . (int)$err . ').', 'Error de carga');
+                Flash::error('Error al subir la imagen (código ' . (int)$err . ').', 'Error de carga', 6000, 'top-end');
                 $this->redirect('/products/create');
             }
         }
@@ -137,7 +137,7 @@ class ProductsController extends Controller {
         Audit::log('product', (int)$newId, 'create', [
             'sku' => $d['sku'], 'name' => $d['name'], 'price' => $d['price'], 'stock' => $d['stock'], 'status' => $d['status']
         ]);
-        Flash::success('Producto creado correctamente', 'Éxito');
+        Flash::success('Producto creado correctamente', 'Éxito', 6000, 'top-end');
         $this->redirect('/products');
     }
 
@@ -170,15 +170,15 @@ class ProductsController extends Controller {
             'supplier_id' => isset($_POST['supplier_id']) && ctype_digit((string)$_POST['supplier_id']) ? (int)$_POST['supplier_id'] : null,
         ];
         if ($d['sku'] === '' || $d['name'] === '') {
-            Flash::error('SKU y Nombre son obligatorios', 'Datos incompletos');
+            Flash::error('SKU y Nombre son obligatorios', 'Datos incompletos', 6000, 'top-end');
             $this->redirect('/products/edit/' . (int)$id);
         }
         if ($d['stock'] < 0) {
-            Flash::error('El stock no puede ser negativo', 'Valor inválido');
+            Flash::error('El stock no puede ser negativo', 'Valor inválido', 6000, 'top-end');
             $this->redirect('/products/edit/' . (int)$id);
         }
         if ($d['price'] < 0) {
-            Flash::error('El precio no puede ser negativo', 'Valor inválido');
+            Flash::error('El precio no puede ser negativo', 'Valor inválido', 6000, 'top-end');
             $this->redirect('/products/edit/' . (int)$id);
         }
         // Handle optional new image
@@ -191,11 +191,11 @@ class ProductsController extends Controller {
                 $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
                 $allowed = ['jpg','jpeg','png','gif','webp'];
                 if (!in_array($ext, $allowed, true)) {
-                    Flash::error('Formato de imagen no permitido. Usa JPG, PNG, GIF o WEBP.', 'Archivo inválido');
+                    Flash::error('Formato de imagen no permitido. Usa JPG, PNG, GIF o WEBP.', 'Archivo inválido', 6000, 'top-end');
                     $this->redirect('/products/edit/' . (int)$id);
                 }
                 if ($size > 5 * 1024 * 1024) { // 5MB
-                    Flash::error('La imagen supera el tamaño máximo de 5MB.', 'Archivo demasiado grande');
+                    Flash::error('La imagen supera el tamaño máximo de 5MB.', 'Archivo demasiado grande', 6000, 'top-end');
                     $this->redirect('/products/edit/' . (int)$id);
                 }
                 $destDir = __DIR__ . '/../../public/uploads';
@@ -203,12 +203,12 @@ class ProductsController extends Controller {
                 $newName = 'prod_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
                 $destPath = $destDir . DIRECTORY_SEPARATOR . $newName;
                 if (!move_uploaded_file($tmp, $destPath)) {
-                    Flash::error('No se pudo guardar la imagen en el servidor.', 'Error de carga');
+                    Flash::error('No se pudo guardar la imagen en el servidor.', 'Error de carga', 6000, 'top-end');
                     $this->redirect('/products/edit/' . (int)$id);
                 }
                 $d['image'] = $newName;
             } elseif ($err !== UPLOAD_ERR_NO_FILE) {
-                Flash::error('Error al subir la imagen (código ' . (int)$err . ').', 'Error de carga');
+                Flash::error('Error al subir la imagen (código ' . (int)$err . ').', 'Error de carga', 6000, 'top-end');
                 $this->redirect('/products/edit/' . (int)$id);
             }
         }
@@ -221,7 +221,7 @@ class ProductsController extends Controller {
         foreach (['stock','price'] as $nk) { if (isset($before[$nk])) $before[$nk] = (int)$before[$nk]; }
         $changes = Audit::diff($before, $after, $keys);
         if (!empty($changes)) { Audit::log('product', (int)$id, 'update', $changes); }
-        Flash::success('Producto actualizado correctamente', 'Éxito');
+        Flash::success('Producto actualizado correctamente', 'Éxito', 6000, 'top-end');
         $this->redirect('/products');
     }
 

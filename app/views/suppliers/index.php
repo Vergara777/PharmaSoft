@@ -50,7 +50,7 @@
               <td><?= View::e($s['email'] ?? '') ?></td>
               <td class="text-right">
                 <a class="btn btn-sm btn-outline-secondary" href="<?= BASE_URL ?>/suppliers/edit/<?= (int)$s['id'] ?>"><i class="fas fa-edit"></i></a>
-                <form method="post" action="<?= BASE_URL ?>/suppliers/delete/<?= (int)$s['id'] ?>" style="display:inline;" onsubmit="return window.confirmAction ? window.confirmAction({title:'Eliminar proveedor', text:'Esta acción no se puede deshacer'}) : confirm('¿Eliminar proveedor?');">
+                <form method="post" action="<?= BASE_URL ?>/suppliers/delete/<?= (int)$s['id'] ?>" style="display:inline;" class="js-confirmable" data-confirm-title="Eliminar proveedor" data-confirm-text="Esta acción no se puede deshacer" data-confirm-ok="Eliminar" data-confirm-cancel="Cancelar">
                   <input type="hidden" name="csrf" value="<?= Security::csrfToken() ?>">
                   <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
                 </form>

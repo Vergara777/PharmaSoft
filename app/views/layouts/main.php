@@ -4,6 +4,12 @@
   $isAuth = Auth::check();
   $reqUri = $_SERVER['REQUEST_URI'] ?? '';
   $isLogin = (strpos($reqUri, '/auth/login') !== false);
+  // Active nav helpers
+  $isDash = (strpos($reqUri, '/dashboard') !== false);
+  $isProductsPg = (strpos($reqUri, '/products') !== false);
+  $isSalesPg = (strpos($reqUri, '/sales') !== false);
+  $isUsersPg = (strpos($reqUri, '/users') !== false);
+  $isProfilePg = (strpos($reqUri, '/profile') !== false);
   // Current Colombia time from server
   try {
     $coNow = new DateTime('now', new DateTimeZone('America/Bogota'));
@@ -33,15 +39,17 @@
     .app-loading-overlay.fade-exit-active { opacity: 0; transition: opacity .18s ease-in; }
     /* Toasts */
     /* Force dark toast background and light text with high specificity */
-    .swal2-container .swal2-popup.ps-toast { background: #0b1220 !important; color: #e5e7eb !important; border-radius: 14px; padding: 14px 16px; box-shadow: none !important; width: 460px; border: 1px solid rgba(255,255,255,.06); }
+    /* Toast container: force top-right placement only for our toasts */
+    .swal2-container.ps-toast-container { justify-content: flex-end !important; align-items: flex-start !important; padding: 12px 16px !important; }
+    .swal2-container .swal2-popup.ps-toast { background: #0b1220 !important; color: #e5e7eb !important; border-radius: 14px; padding: 12px 14px; box-shadow: none !important; width: 300px; border: 1px solid rgba(255,255,255,.06); }
     .swal2-container .swal2-popup.ps-toast .swal2-html-container { color: inherit !important; margin: 0 !important; }
     .swal2-popup.ps-toast .swal2-close { color: #e5e7eb; opacity: .7; }
     .swal2-popup.ps-toast .swal2-timer-progress-bar { height: 4px; background: #22c55e; border-radius: 0 0 12px 12px; }
     .ps-toast-body { display: grid; grid-template-columns: 46px 1fr; gap: 14px; align-items: flex-start; }
-    .ps-toast-icon { width: 46px; height: 46px; border-radius: 11px; display: grid; place-items: center; color: #0b1220; font-size: 18px; box-shadow: none !important; }
+    .ps-toast-icon { width: 46px; height: 46px; border-radius: 11px; display: grid; place-items: center; color: #ffffff; font-size: 18px; box-shadow: none !important; }
     .ps-toast-title { font-weight: 900; color: #f9fafb; margin-top: 0; font-size: 15px; }
     .ps-toast-text { color: #f3f4f6; opacity: .98; margin-top: 4px; font-size: 14px; font-weight: 700; }
-    .ps-toast.ps-success .ps-toast-icon { background: #86efac; }
+    .ps-toast.ps-success .ps-toast-icon { background: #0b1220; color: #22c55e; border: 2px solid #22c55e; }
     .ps-toast.ps-warning .ps-toast-icon { background: #fcd34d; }
     .ps-toast.ps-error .ps-toast-icon { background: #fca5a5; }
     .ps-toast.ps-info .ps-toast-icon { background: #93c5fd; }
@@ -148,20 +156,40 @@
     .ps-empty-state .box { text-align: center; max-width: 680px; }
     .ps-empty-state .title { font-weight: 900; font-size: 1.25rem; color: #111827; }
     .ps-empty-state .desc { margin-top: 6px; font-weight: 700; }
+    /* Pretty top navbar */
+    .ps-navbar.navbar { box-shadow: 0 1px 0 rgba(0,0,0,.04); }
+    .ps-navbar .nav-link { font-weight: 700; color: #374151; padding: 10px 12px; position: relative; border-radius: 8px; }
+    .ps-navbar .nav-link:hover { color: #111827; background: rgba(59,130,246,.08); }
+    .ps-navbar .nav-link.active { color: #0f172a; background: rgba(59,130,246,.12); }
+    .ps-navbar .nav-link.active::after, .ps-navbar .nav-link:hover::after { content:''; position:absolute; left:12px; right:12px; bottom:4px; height:2px; background:#3b82f6; border-radius:2px; }
+    /* Profile chip */
+    .user-menu > .nav-link { display: inline-flex; align-items: center; gap: 8px; }
+    .user-menu > .nav-link .user-image { width: 28px; height: 28px; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+    .user-menu > .nav-link span { font-weight: 700; color: #111827; }
+    /* Dropdown redesign */
+    .ps-user-dd { width: 320px; overflow: hidden; border-radius: 12px; box-shadow: 0 18px 50px rgba(0,0,0,.18); }
+    .ps-user-dd-header { background: linear-gradient(135deg,#1d4ed8,#3b82f6); text-align:center; padding: 18px 16px; }
+    .ps-user-dd-header .avatar { width: 84px; height: 84px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 6px 18px rgba(0,0,0,.25); object-fit: cover; }
+    .ps-user-dd-header .name { color:#fff; font-weight: 900; font-size: 17px; margin-top: 10px; }
+    .ps-user-dd-header .email { color: rgba(255,255,255,.95); font-weight: 600; font-size: 13px; }
+    .ps-user-dd .dd-actions { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; background:#fff; }
+    .ps-user-dd .dd-actions .btn { font-weight: 700; font-size: 13px; padding: 6px 10px; border-radius: 8px; }
+    .ps-user-dd .btn-profile { }
+    .ps-user-dd .btn-logout { }
   </style>
 </head>
 <body class="hold-transition sidebar-mini sidebar-collapse ps-no-anim<?= $isLogin ? ' login-body' : ' layout-navbar-fixed layout-fixed' ?>">
 <div class="wrapper">
   <?php if (!$isLogin && $isAuth): ?>
-  <nav class="main-header navbar navbar-expand navbar-white navbar-light">
+  <nav class="main-header navbar navbar-expand navbar-white navbar-light ps-navbar">
     <?php $isTech = Auth::isTechnician(); $isAdmin = Auth::isAdmin(); ?>
     <ul class="navbar-nav">
       <li class="nav-item"><a class="nav-link" data-widget="pushmenu" href="#"><i class="fas fa-bars"></i></a></li>
-      <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/dashboard" class="nav-link">Dashboard</a></li>
-      <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/products" class="nav-link">Productos</a></li>
-      <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/sales" class="nav-link">Ventas</a></li>
+      <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/dashboard" class="nav-link<?= $isDash ? ' active' : '' ?>">Dashboard</a></li>
+      <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/products" class="nav-link<?= $isProductsPg ? ' active' : '' ?>">Productos</a></li>
+      <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/sales" class="nav-link<?= $isSalesPg ? ' active' : '' ?>">Ventas</a></li>
       <?php if ($isAdmin): ?>
-        <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/users" class="nav-link">Usuarios</a></li>
+        <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/users" class="nav-link<?= $isUsersPg ? ' active' : '' ?>">Usuarios</a></li>
       <?php endif; ?>
     </ul>
     <ul class="navbar-nav ml-auto align-items-center">
@@ -177,17 +205,17 @@
           <img src="<?= View::e($avatar_q) ?>" class="user-image img-circle elevation-2" alt="Avatar" style="object-fit:cover; width:32px; height:32px;">
           <span class="d-none d-md-inline"><?= View::e($name) ?></span>
         </a>
-        <ul class="dropdown-menu dropdown-menu-lg dropdown-menu-right">
-          <li class="user-header bg-primary">
-            <img src="<?= View::e($avatar_q) ?>" class="img-circle elevation-2" alt="User Image" style="object-fit:cover; width:80px; height:80px;">
-            <p>
-              <?= View::e($name) ?><br>
-              <small><?= View::e($_SESSION['user']['email'] ?? '') ?></small>
-            </p>
+        <ul class="dropdown-menu dropdown-menu-lg dropdown-menu-right ps-user-dd">
+          <li class="ps-user-dd-header">
+            <img src="<?= View::e($avatar_q) ?>" class="avatar" alt="Avatar">
+            <div class="name"><?= View::e($name) ?></div>
+            <div class="email"><?= View::e($_SESSION['user']['email'] ?? '') ?></div>
           </li>
-          <li class="user-footer d-flex justify-content-between">
-            <a href="<?= BASE_URL ?>/profile" class="btn btn-default btn-flat">Perfil</a>
-            <a href="<?= BASE_URL ?>/auth/logout" class="btn btn-default btn-flat">Salir</a>
+          <li class="p-2">
+            <div class="dd-actions">
+              <a href="<?= BASE_URL ?>/profile" class="btn btn-outline-secondary btn-profile"><i class="fas fa-user mr-1"></i> Gestionar perfil</a>
+              <a href="<?= BASE_URL ?>/auth/logout" class="btn btn-outline-danger btn-logout js-confirmable" data-confirm-title="Cerrar sesión" data-confirm-text="¿Seguro que deseas cerrar sesión?" data-confirm-ok="Cerrar" data-confirm-cancel="Cancelar"><i class="fas fa-sign-out-alt mr-1"></i> Cerrar sesión</a>
+            </div>
           </li>
         </ul>
       </li>
@@ -321,7 +349,7 @@
     toast: true,
     position: 'top-end',
     showConfirmButton: false,
-    timer: 4200,
+    timer: 4000,
     timerProgressBar: true,
     showCloseButton: true,
     customClass: { container: 'ps-toast-container' },
@@ -342,12 +370,11 @@
     const cls = map[type] || 'ps-fb-info';
     let container = document.querySelector('.ps-fallback-toasts');
     if (!container) { container = document.createElement('div'); container.className = 'ps-fallback-toasts'; document.body.appendChild(container); }
-    if (options.position && options.position.includes('bottom')) {
-      container.style.top = 'auto'; container.style.bottom = '16px';
-    } else { container.style.top = '16px'; container.style.bottom = 'auto'; }
-    if (options.position && options.position.includes('left')) {
-      container.style.right = 'auto'; container.style.left = '16px';
-    } else { container.style.right = '16px'; container.style.left = 'auto'; }
+    // Always top-right for fallback toasts
+    container.style.top = '16px';
+    container.style.bottom = 'auto';
+    container.style.right = '16px';
+    container.style.left = 'auto';
     const el = document.createElement('div'); el.className = 'ps-fallback-toast ' + cls;
     el.innerHTML = `
       <div class="ps-fallback-icon"><i class="fas ${iconMap[type]||'fa-info'}"></i></div>
@@ -362,7 +389,7 @@
     const close = el.querySelector('.ps-fallback-close');
     close.addEventListener('click', () => { container.removeChild(el); });
     if (!options.sticky) {
-      // animate progress bar
+      // Force default 4s timer unless sticky or explicitly set
       const ttl = Math.max(2000, options.timer || 4000);
       bar.style.transform = 'scaleX(1)';
       bar.style.transition = `transform ${ttl}ms linear`;
@@ -398,17 +425,23 @@
       </div>`;
     if (window.Swal && Toast) {
       const defaults = { icon: undefined, html, customClass: { popup: `ps-toast ${map.cls}` } };
-      const pos = options.position || 'top-end';
+      // Force all app toasts to render top-right consistently
+      const pos = 'top-end';
       // Remove built-in title/text/icon to avoid duplicates and low-contrast defaults
       const clean = Object.assign({}, options);
       delete clean.title; delete clean.text; delete clean.html; delete clean.icon;
+      // Ignore any incoming position to guarantee top-right
+      delete clean.position;
+      // Ensure a default 4s timer unless sticky or explicitly set
+      if (!clean.sticky && (typeof clean.timer === 'undefined' || clean.timer === null)) { clean.timer = 4000; }
       // Enforce high-contrast colors
       clean.background = '#0b1220';
       clean.color = '#e5e7eb';
       if (options.sticky) { clean.timer = undefined; clean.showCloseButton = true; }
-      Toast.fire(Object.assign({}, defaults, { position: pos }, clean));
+      // Merge with clean last but keep position enforced at the end
+      Toast.fire(Object.assign({}, defaults, clean, { position: pos }));
     } else {
-      domToast({ icon: type, title, text, timer: options.timer, position: options.position, sticky: !!options.sticky });
+      domToast({ icon: type, title, text, timer: options.timer, sticky: !!options.sticky });
     }
   }
   window.notifySuccess = (msg) => notify('success', msg);
@@ -563,13 +596,31 @@
         var tr=b.closest('tr'); var idx = tr ? parseInt(tr.getAttribute('data-i')||'-1',10) : -1; var arr = read();
         if (idx>=0 && idx < arr.length){ arr.splice(idx,1); write(arr); render(); }
         try { if (window.bannerLoading) bannerLoading(false); } catch(_){ }
+        try { notify({ icon:'success', title:'Producto quitado del carrito' }); } catch(_){ }
       }); }); }
     }
     function open(){ if (!modal) return; render(); modal.style.display='block'; document.body.style.overflow='hidden'; }
     function close(){ if (!modal) return; modal.style.display='none'; document.body.style.overflow=''; }
-    if (fab) fab.addEventListener('click', function(e){ e.preventDefault(); open(); });
-    if (mClose) mClose.addEventListener('click', function(){ close(); });
-    if (mBackdrop) mBackdrop.addEventListener('click', function(e){ if (e.target===mBackdrop) close(); });
+    if (fab) fab.addEventListener('click', function(e){
+      e.preventDefault();
+      try { if (window.loadingBar) loadingBar.start('Abriendo carrito...'); } catch(_){ try { bannerLoading(true, 'Abriendo carrito...'); } catch(__){} }
+      // Render and open immediately, then stop loader shortly after
+      open();
+      setTimeout(function(){
+        try { if (window.loadingBar) loadingBar.stop(); else bannerLoading(false); } catch(_){ }
+        try { notify({ icon:'info', title:'Carrito abierto' }); } catch(_){ }
+      }, 600);
+    });
+    function closeWithFeedback(){
+      try { if (window.loadingBar) loadingBar.start('Cerrando carrito...'); } catch(_){ try { bannerLoading(true, 'Cerrando carrito...'); } catch(__){} }
+      close();
+      setTimeout(function(){
+        try { if (window.loadingBar) loadingBar.stop(); else bannerLoading(false); } catch(_){ }
+        try { notify({ icon:'info', title:'Carrito cerrado' }); } catch(_){ }
+      }, 600);
+    }
+    if (mClose) mClose.addEventListener('click', closeWithFeedback);
+    if (mBackdrop) mBackdrop.addEventListener('click', function(e){ if (e.target===mBackdrop) closeWithFeedback(); });
     if (mClear) mClear.addEventListener('click', function(){
       // Close modal first, then confirm, then show loader and clear, and reopen
       close();
@@ -591,6 +642,7 @@
         try { if (window.bannerLoading) bannerLoading(false); } catch(_){ }
         // Reopen modal after operation
         open();
+        try { notify({ icon:'success', title:'Carrito vaciado' }); } catch(_){ }
       });
     });
     // expose for live control from any page
@@ -895,7 +947,7 @@
 <script>
   (function(){
     const msgs = <?php echo json_encode($___fl, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
-    msgs.forEach(m => notify({ icon: m.type || 'info', title: m.title || '', text: m.message || '', timer: (m.timer && m.timer > 0) ? m.timer : undefined }));
+    msgs.forEach(m => notify({ icon: m.type || 'info', title: m.title || '', text: m.message || '', timer: (m.timer && m.timer > 0) ? m.timer : undefined, position: m.position || undefined }));
   })();
 </script>
 <?php endif; ?>
