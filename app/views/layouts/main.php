@@ -9,6 +9,8 @@
   $isProductsPg = (strpos($reqUri, '/products') !== false);
   $isSalesPg = (strpos($reqUri, '/sales') !== false);
   $isUsersPg = (strpos($reqUri, '/users') !== false);
+  $isSuppliersPg = (strpos($reqUri, '/suppliers') !== false);
+  $isCategoriesPg = (strpos($reqUri, '/categories') !== false);
   $isProfilePg = (strpos($reqUri, '/profile') !== false);
   // Current Colombia time from server
   try {
@@ -158,10 +160,12 @@
     .ps-empty-state .desc { margin-top: 6px; font-weight: 700; }
     /* Pretty top navbar */
     .ps-navbar.navbar { box-shadow: 0 1px 0 rgba(0,0,0,.04); }
-    .ps-navbar .nav-link { font-weight: 700; color: #374151; padding: 10px 12px; position: relative; border-radius: 8px; }
-    .ps-navbar .nav-link:hover { color: #111827; background: rgba(59,130,246,.08); }
-    .ps-navbar .nav-link.active { color: #0f172a; background: rgba(59,130,246,.12); }
-    .ps-navbar .nav-link.active::after, .ps-navbar .nav-link:hover::after { content:''; position:absolute; left:12px; right:12px; bottom:4px; height:2px; background:#3b82f6; border-radius:2px; }
+    .ps-navbar .navbar-nav { align-items: center; gap: 8px; flex-wrap: nowrap; }
+    .ps-navbar .navbar-nav > .nav-item { margin-right: 0; }
+    .ps-navbar .nav-link { font-weight: 700; color: #374151; padding: 6px 10px; border-radius: 10px; display: inline-flex; align-items: center; line-height: 1; font-size: 14px; }
+    .ps-navbar .nav-link i { opacity: .9; font-size: 15px; margin-right: 6px; }
+    .ps-navbar .nav-link:hover { color: #111827; background: rgba(59,130,246,.10); }
+    .ps-navbar .nav-link.active { color: #0f172a; background: rgba(59,130,246,.18); box-shadow: inset 0 0 0 1px rgba(59,130,246,.35); }
     /* Profile chip */
     .user-menu > .nav-link { display: inline-flex; align-items: center; gap: 8px; }
     .user-menu > .nav-link .user-image { width: 28px; height: 28px; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
@@ -173,9 +177,16 @@
     .ps-user-dd-header .name { color:#fff; font-weight: 900; font-size: 17px; margin-top: 10px; }
     .ps-user-dd-header .email { color: rgba(255,255,255,.95); font-weight: 600; font-size: 13px; }
     .ps-user-dd .dd-actions { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; background:#fff; }
-    .ps-user-dd .dd-actions .btn { font-weight: 700; font-size: 13px; padding: 6px 10px; border-radius: 8px; }
+    .ps-user-dd .btn { font-weight: 700; font-size: 13px; padding: 6px 10px; border-radius: 8px; }
     .ps-user-dd .btn-profile { }
     .ps-user-dd .btn-logout { }
+    /* Sidebar hide/show behavior */
+    .sidebar-hidden .main-sidebar { display: none !important; }
+    .sidebar-hidden .content-wrapper { margin-left: 0 !important; }
+    /* Brand that appears only when sidebar is hidden */
+    .ps-topbrand { display: none; align-items: center; gap: 8px; font-weight: 900; color: #0f172a; margin-left: 6px; margin-right: 10px; font-size: 16px; }
+    .ps-topbrand .icon { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; background: #e0e7ff; color: #1d4ed8; }
+    .sidebar-hidden .ps-topbrand { display: inline-flex; }
   </style>
 </head>
 <body class="hold-transition sidebar-mini sidebar-collapse ps-no-anim<?= $isLogin ? ' login-body' : ' layout-navbar-fixed layout-fixed' ?>">
@@ -184,12 +195,15 @@
   <nav class="main-header navbar navbar-expand navbar-white navbar-light ps-navbar">
     <?php $isTech = Auth::isTechnician(); $isAdmin = Auth::isAdmin(); ?>
     <ul class="navbar-nav">
-      <li class="nav-item"><a class="nav-link" data-widget="pushmenu" href="#"><i class="fas fa-bars"></i></a></li>
-      <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/dashboard" class="nav-link<?= $isDash ? ' active' : '' ?>">Dashboard</a></li>
-      <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/products" class="nav-link<?= $isProductsPg ? ' active' : '' ?>">Productos</a></li>
-      <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/sales" class="nav-link<?= $isSalesPg ? ' active' : '' ?>">Ventas</a></li>
+      <li class="nav-item"><a class="nav-link" id="psToggleSidebar" data-widget="pushmenu" href="#"><i class="fas fa-bars"></i></a></li>
+      <li class="nav-item align-self-center"><span class="ps-topbrand"><span class="icon"><i class="fas fa-capsules"></i></span><span><?= View::e(APP_NAME) ?></span></span></li>
+      <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/dashboard" class="nav-link<?= $isDash ? ' active' : '' ?>"><i class="fas fa-tachometer-alt mr-1" aria-hidden="true"></i> Dashboard</a></li>
+      <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/products" class="nav-link<?= $isProductsPg ? ' active' : '' ?>"><i class="fas fa-pills mr-1" aria-hidden="true"></i> Productos</a></li>
+      <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/sales" class="nav-link<?= $isSalesPg ? ' active' : '' ?>"><i class="fas fa-cash-register mr-1" aria-hidden="true"></i> Ventas</a></li>
       <?php if ($isAdmin): ?>
-        <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/users" class="nav-link<?= $isUsersPg ? ' active' : '' ?>">Usuarios</a></li>
+        <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/users" class="nav-link<?= $isUsersPg ? ' active' : '' ?>"><i class="fas fa-users mr-1" aria-hidden="true"></i> Usuarios</a></li>
+        <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/suppliers" class="nav-link<?= $isSuppliersPg ? ' active' : '' ?>"><i class="fas fa-truck mr-1" aria-hidden="true"></i> Proveedores</a></li>
+        <li class="nav-item d-none d-sm-inline-block"><a href="<?= BASE_URL ?>/categories" class="nav-link<?= $isCategoriesPg ? ' active' : '' ?>"><i class="fas fa-tags mr-1" aria-hidden="true"></i> Categorías</a></li>
       <?php endif; ?>
     </ul>
     <ul class="navbar-nav ml-auto align-items-center">
@@ -325,6 +339,26 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.7/dist/sweetalert2.all.min.js"></script>
 <script src="<?= BASE_URL ?>/js/confirm-modal.js?v=20250826-0138"></script>
 <script>
+  // Sidebar hide/show toggle with persistence and brand swap
+  (function(){
+    const key = 'psSidebarHidden';
+    const body = document.body;
+    const apply = (hidden) => {
+      if (hidden) { body.classList.add('sidebar-hidden'); body.classList.add('sidebar-collapse'); }
+      else { body.classList.remove('sidebar-hidden'); }
+    };
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved === '1') apply(true);
+    } catch (e) {}
+    const btn = document.getElementById('psToggleSidebar');
+    if (btn) btn.addEventListener('click', function(ev){
+      ev.preventDefault();
+      const hidden = !body.classList.contains('sidebar-hidden');
+      apply(hidden);
+      try { localStorage.setItem(key, hidden ? '1' : '0'); } catch (e) {}
+    });
+  })();
   // Sync content offset with real navbar height to avoid any white gap
   (function(){
     function setHeaderH(){
