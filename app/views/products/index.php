@@ -447,6 +447,41 @@
   <?php
     $hasAnyFilter = (!empty($q) || !empty($categoryId) || (!empty($expiry) && $expiry !== 'all') || !empty($stock));
   ?>
+  <script>
+    // Build detailed notifications (expired and expiring soon) with product names
+    (function(){
+      try {
+        var tbl = document.querySelector('.table.table-hover tbody');
+        if (!tbl) return;
+        var expired = [], soon = [];
+        tbl.querySelectorAll('tr').forEach(function(tr){
+          try {
+            var daysAttr = tr.getAttribute('data-days');
+            if (daysAttr === null || daysAttr === '') return;
+            var days = parseInt(daysAttr, 10);
+            var nameEl = tr.querySelector('.name-text');
+            var name = (nameEl && nameEl.textContent) ? nameEl.textContent.trim() : '';
+            if (!name) return;
+            if (!isNaN(days)) {
+              if (days < 0) expired.push(name);
+              else if (days <= 30) soon.push(name);
+            }
+          } catch(_){ }
+        });
+        if (expired.length || soon.length) {
+          var parts = [];
+          if (expired.length) parts.push('<div><span class="badge badge-danger mr-1">Vencidos: '+expired.length+'</span> '+expired.slice(0,10).join(', ')+(expired.length>10?'…':'')+'</div>');
+          if (soon.length) parts.push('<div><span class="badge badge-warning mr-1">Por vencer (≤30d): '+soon.length+'</span> '+soon.slice(0,10).join(', ')+(soon.length>10?'…':'')+'</div>');
+          var html = parts.join('');
+          if (window.notify) {
+            window.notify({ icon: 'info', title: 'Alertas de vencimiento', html: html, timeout: 8000 });
+          } else if (window.Swal && window.Swal.fire) {
+            window.Swal.fire({ icon: 'info', title: 'Alertas de vencimiento', html: html, confirmButtonText: 'Entendido' });
+          }
+        }
+      } catch(_){ }
+    })();
+  </script>
   <?php if (!empty($noProducts) && $noProducts && $hasAnyFilter): ?>
   <script>
     (function(){
@@ -951,10 +986,19 @@
           try { window.bannerLoadingMinDuration = 3500; } catch(_){ }
           try { if (window.bannerLoading) bannerLoading(true, 'Agregando productos...'); } catch(_){ }
           try {
-            var KEY = 'pharmasoft_sales_draft';
+            var uid = <?= (int)(\App\Helpers\Auth::id() ?? 0) ?>;
+            var KEY = 'pharmasoft_sales_draft_' + uid;
             var LEGACY = 'pharmasoft_pending_cart';
-            // migrate legacy if present
-            (function migrate(){ try { var old = localStorage.getItem(LEGACY); if (old && !localStorage.getItem(KEY)) { localStorage.setItem(KEY, old); localStorage.removeItem(LEGACY); } } catch(_){} })();
+            var SHARED = 'pharmasoft_sales_draft';
+            // migrate legacy/shared if present
+            (function migrate(){
+              try {
+                var shared = localStorage.getItem(SHARED);
+                if (shared && !localStorage.getItem(KEY)) { localStorage.setItem(KEY, shared); }
+                var old = localStorage.getItem(LEGACY);
+                if (old && !localStorage.getItem(KEY)) { localStorage.setItem(KEY, old); localStorage.removeItem(LEGACY); }
+              } catch(_){ }
+            })();
             var arr = [];
             try { arr = JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch(e){ arr = []; }
             var found = false;
@@ -1086,8 +1130,10 @@
     (function cartModalProducts(){
       // If global cart exists, do not init local cart modal
       if (document.getElementById('globalCartFab')) return;
-      var KEY = 'pharmasoft_sales_draft';
+      var uid = <?= (int)(\App\Helpers\Auth::id() ?? 0) ?>;
+      var KEY = 'pharmasoft_sales_draft_' + uid;
       var LEGACY = 'pharmasoft_pending_cart';
+      var SHARED = 'pharmasoft_sales_draft';
       var fab = document.getElementById('btnCartFloating');
       var fabCount = document.getElementById('cartFabCount');
       var modal = document.getElementById('cartModal');
@@ -1100,7 +1146,14 @@
       var mClear = document.getElementById('cartModalClear');
 
       function fmt(n){ try { return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0}).format(n||0); } catch(e){ var v=Math.round(n||0); return '$'+String(v).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); } }
-      function migrate(){ try { var old = localStorage.getItem(LEGACY); if (old && !localStorage.getItem(KEY)) { localStorage.setItem(KEY, old); localStorage.removeItem(LEGACY); } } catch(_){} }
+      function migrate(){
+        try {
+          var shared = localStorage.getItem(SHARED);
+          if (shared && !localStorage.getItem(KEY)) { localStorage.setItem(KEY, shared); }
+          var old = localStorage.getItem(LEGACY);
+          if (old && !localStorage.getItem(KEY)) { localStorage.setItem(KEY, old); localStorage.removeItem(LEGACY); }
+        } catch(_){ }
+      }
       function read(){ migrate(); try { var raw = localStorage.getItem(KEY); var arr = raw ? JSON.parse(raw||'[]')||[] : []; return Array.isArray(arr)?arr:[]; } catch(_){ return []; } }
       function write(arr){ try { if (arr && arr.length) localStorage.setItem(KEY, JSON.stringify(arr)); else localStorage.removeItem(KEY); } catch(_){} }
       function total(arr){ var t=0; (arr||[]).forEach(function(it){ var q=parseInt(it.qty||0,10)||0; var p=Math.round(parseFloat(it.unit_price||0)||0); t+=q*p; }); return t; }

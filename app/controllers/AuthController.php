@@ -20,10 +20,25 @@ class AuthController extends Controller {
         if ($user && password_verify($password, $user['password_hash'])) {
             unset($user['password_hash']);
             $_SESSION['user'] = $user;
+            // trigger one-time welcome modal on next request
+            // 1 = primera vez (en este navegador); 2 = bienvenido de vuelta
+            $seen = isset($_COOKIE['ps_welcome_seen']) && $_COOKIE['ps_welcome_seen'] === '1';
+            $_SESSION['welcome'] = $seen ? 2 : 1;
+            // set persistent cookie (30 días)
+            try { setcookie('ps_welcome_seen', '1', time() + 60*60*24*30, '/'); } catch (\Throwable $_) { /* noop */ }
             session_regenerate_id(true);
+            // Ensure session data (welcome flag, user) is persisted before redirect
+            try { session_write_close(); } catch (\Throwable $_) { }
             $this->redirect('/dashboard');
         } else {
-            $this->view('auth/login', ['error' => 'Credenciales inválidas', 'title' => 'Iniciar sesión']);
+            // Determine specific error
+            $payload = ['title' => 'Iniciar sesión', 'email' => $email];
+            if (!$user) {
+                $payload['errorEmail'] = 'Correo incorrecto';
+            } else {
+                $payload['errorPassword'] = 'Contraseña incorrecta';
+            }
+            $this->view('auth/login', $payload);
         }
     }
 

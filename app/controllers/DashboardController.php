@@ -135,6 +135,10 @@ class DashboardController extends Controller {
         if ($debugExpiry) {
             Flash::info('Debug: vencidos='.$expired.' | por vencer='.$expiringSoon, 'Debug Expiración', 6000, 'top-end');
         }
+        // Detailed lists for welcome modal (expired and expiring soon)
+        $expiredDetails = $db->query("SELECT name, sku, stock, DATEDIFF(CURDATE(), expires_at) AS days_over, DATE_FORMAT(expires_at,'%d/%m/%Y') d FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at < CURDATE() ORDER BY expires_at ASC, name ASC LIMIT 10")->fetchAll();
+        $expiringDetails = $db->query("SELECT name, sku, stock, DATEDIFF(expires_at, CURDATE()) AS days_left, DATE_FORMAT(expires_at,'%d/%m/%Y') d FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at >= CURDATE() AND expires_at <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) ORDER BY expires_at ASC, name ASC LIMIT 10")->fetchAll();
+
         // Notify expired products
         if ($expired > 0) {
             $expiredList = $db->query("SELECT name, sku, DATE_FORMAT(expires_at,'%d/%m/%Y') d FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at < CURDATE() ORDER BY expires_at ASC, name ASC LIMIT 5")->fetchAll();
@@ -142,7 +146,7 @@ class DashboardController extends Controller {
                 $n = isset($r['name']) ? $r['name'] : '';
                 $s = isset($r['sku']) ? $r['sku'] : '';
                 $d = isset($r['d']) ? $r['d'] : '';
-                return trim(($s ? ("[$s] ") : '') . $n . ($d ? (" (".$d.")") : ''));
+                return trim(($s ? ("[".$s."] ") : '') . $n . ($d ? (" (".$d.")") : ''));
             }, $expiredList ?: []);
             $extra = $expired > count($items) ? (' y +' . ($expired - count($items)) . ' más') : '';
             $msg = 'Tienes ' . $expired . ' producto(s) VENCIDO(s).' . (empty($items) ? '' : (' Ej: ' . implode(', ', $items))) . $extra;
@@ -184,6 +188,15 @@ class DashboardController extends Controller {
             $msg4 = 'Productos con stock bajo (≤ ' . $thr . '): ' . $lowPositiveCount . '.' . (empty($items4) ? '' : (' Ej: ' . implode(', ', $items4))) . $extra4;
             Flash::info($msg4, 'Stock bajo', 4000, 'top-end');
         }
-        $this->view('dashboard/index', compact('totalProducts','lowStock','expiring','expired','expiringSoon','todaySalesCount','todaySalesTotal','monthSalesTotal','yearSalesTotal','monthProfit','yearProfit','todaySales','lowStockList','topProducts','heatmap','zeroStock','zeroStockList') + ['title' => 'Dashboard']);
+        // One-time welcome modal after login: 1=primera vez, 2=de vuelta
+        $welcome = (int)($_SESSION['welcome'] ?? 0);
+        // QA override via query: /dashboard?welcome=1|2
+        if (isset($_GET['welcome'])) {
+            $wq = (int)$_GET['welcome'];
+            if ($wq === 1 || $wq === 2) { $welcome = $wq; }
+        }
+        if ($welcome && !isset($_GET['welcome'])) { unset($_SESSION['welcome']); }
+        $user = Auth::user();
+        $this->view('dashboard/index', compact('totalProducts','lowStock','expiring','expired','expiringSoon','todaySalesCount','todaySalesTotal','monthSalesTotal','yearSalesTotal','monthProfit','yearProfit','todaySales','lowStockList','topProducts','heatmap','zeroStock','zeroStockList','welcome','user','expiredDetails','expiringDetails') + ['title' => 'Dashboard']);
     }
 }

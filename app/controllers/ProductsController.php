@@ -31,9 +31,15 @@ class ProductsController extends Controller {
         } else {
             $total = $prod->countSearch($q, $categoryId);
         }
-        $pages = max(1, (int)ceil($total / $per));
+        // If a category is selected, disable pagination and show all filtered products
+        $disablePagination = ($categoryId !== null);
+        if ($disablePagination) {
+            $page = 1;
+            $per = max(1, (int)$total);
+        }
+        $pages = max(1, (int)ceil(($per > 0 ? $total / $per : 1)));
         if ($page > $pages) { $page = $pages; }
-        $offset = ($page - 1) * $per;
+        $offset = ($disablePagination ? 0 : (($page - 1) * $per));
         if ($expiryDays !== null || $stockFilter !== null) {
             $products = $prod->searchFilteredPaginated($q, $per, $offset, $categoryId, $expiryDays, $stockFilter, $lowThr);
         } else {
@@ -54,7 +60,7 @@ class ProductsController extends Controller {
             'categoryId' => $categoryId,
             'expiry' => $expiryParam,
             'stock' => $stockFilter,
-            'pagination' => [
+            'pagination' => $disablePagination ? null : [
                 'page' => $page,
                 'per' => $per,
                 'total' => $total,

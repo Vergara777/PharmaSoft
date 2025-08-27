@@ -446,7 +446,10 @@
 
     // ----- Cart modal (localStorage draft) -----
     (function cartModal(){
-      var KEY = 'pharmasoft_sales_draft';
+      var uid = <?= (int)(\App\Helpers\Auth::id() ?? 0) ?>;
+      var KEY = 'pharmasoft_sales_draft_' + uid;
+      var SHARED = 'pharmasoft_sales_draft';
+      var LEGACY = 'pharmasoft_pending_cart';
       var fab = document.getElementById('btnCartFloating');
       var fabCount = document.getElementById('cartFabCount');
       var modal = document.getElementById('cartModal');
@@ -462,7 +465,16 @@
         try { return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0}).format(n||0); }
         catch(e){ var v=Math.round(n||0); return '$'+String(v).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
       }
+      function migrate(){
+        try {
+          var shared = localStorage.getItem(SHARED);
+          if (shared && !localStorage.getItem(KEY)) { localStorage.setItem(KEY, shared); }
+          var old = localStorage.getItem(LEGACY);
+          if (old && !localStorage.getItem(KEY)) { localStorage.setItem(KEY, old); localStorage.removeItem(LEGACY); }
+        } catch(_){ }
+      }
       function read(){
+        migrate();
         try { var raw = localStorage.getItem(KEY); var arr = raw ? JSON.parse(raw||'[]')||[] : []; return Array.isArray(arr)?arr:[]; } catch(_){ return []; }
       }
       function write(arr){ try { if (arr && arr.length) localStorage.setItem(KEY, JSON.stringify(arr)); else localStorage.removeItem(KEY); } catch(_){} }
@@ -586,11 +598,255 @@
     }
     bindRetire('formRetireExpiredTop','btnRetireExpiredTop');
     bindRetire('formRetireExpiredAlert','btnRetireExpiredAlert');
-  });
+
 </script>
 
  
 
- 
 
 <!-- Confirmation handled globally by public/js/confirm-modal.js -->
+
+<?php if (!empty($welcome) && $welcome && !empty($user)): ?>
+  <?php
+    $name = isset($user['name']) ? $user['name'] : '';
+    $roleRaw = isset($user['role']) ? strtolower((string)$user['role']) : '';
+    $roleLabel = 'Usuario';
+    if ($roleRaw === 'admin' || $roleRaw === 'administrator') $roleLabel = 'Administrador';
+    elseif ($roleRaw === 'tecnico' || $roleRaw === 'technician' || $roleRaw === 'tech') $roleLabel = 'Técnico';
+    $welcomeTitleText = ((int)$welcome === 1) ? '¡Bienvenido' : '¡Bienvenido de vuelta';
+    $isAdmin = ($roleLabel === 'Administrador');
+    $uid = isset($user['id']) ? (int)$user['id'] : 0;
+  ?>
+  <div id="welcomeModal" class="ps-modal ps-show" style="display:block; z-index:3050;">
+    <div class="ps-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+      <div class="ps-modal-header" style="background: linear-gradient(135deg,#16a34a,#22c55e,#10b981); color:#fff;">
+        <h5 id="welcomeTitle" class="mb-0 d-flex align-items-center" style="font-weight:900; letter-spacing:.2px;">
+          <i class="fas fa-hand-peace mr-2" aria-hidden="true"></i>
+          <?= View::e($welcomeTitleText) ?>, <?= View::e($name) ?>!
+        </h5>
+        <button type="button" class="close" id="welcomeCloseBtn" aria-label="Cerrar" style="color:#fff; opacity:.85;"><span aria-hidden="true">&times;</span></button>
+      </div>
+      <div class="ps-modal-body">
+        <div class="p-3">
+          <style>
+            /* Scoped to welcome modal only */
+            #welcomeModal .lead { font-weight: 700; color: #111827; }
+            #welcomeModal .kpis { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 12px; margin: 10px 0 14px; }
+            #welcomeModal .kpi { background:#f9fafb; border:1px solid #eee; border-radius:18px; padding:14px; display:flex; align-items:center; gap:12px; box-shadow: 0 6px 18px rgba(0,0,0,.06); }
+            #welcomeModal .kpi i { font-size:1rem; opacity:.9; }
+            #welcomeModal .cta-grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap:10px; }
+            #welcomeModal .cta-grid .btn { display:flex; align-items:center; justify-content:center; gap:8px; font-weight:800; border-radius:999px; padding:12px 14px; box-shadow: 0 6px 16px rgba(0,0,0,.05); }
+            #welcomeModal .btn-dash { background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; }
+            #welcomeModal .btn-products { background:#ecfeff; color:#0e7490; border:1px solid #a5f3fc; }
+            #welcomeModal .btn-sales { background:#ecfccb; color:#3f6212; border:1px solid #bbf7d0; }
+            #welcomeModal .btn-users { background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
+            #welcomeModal .btn-notify { background:#fff7ed; color:#b45309; border:1px solid #fde68a; }
+            #welcomeModal .btn-cart { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+            #welcomeModal .tips { background:#f8fafc; border:1px dashed #cbd5e1; border-radius:16px; padding:12px; }
+            #welcomeModal .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; font-weight:800; font-size:.8rem; border:1px solid #e5e7eb; margin-right:6px; box-shadow: 0 4px 12px rgba(0,0,0,.04); }
+            #welcomeModal .chip.role { background:#eef2ff; color:#3730a3; border-color:#c7d2fe; }
+            #welcomeModal .chip.first { background:#ecfeff; color:#065f46; border-color:#a5f3fc; }
+            #welcomeModal .chip.back { background:#f0fdf4; color:#166534; border-color:#bbf7d0; }
+            /* New colorful chips */
+            #welcomeModal .chip.success { background:#ecfdf5; color:#065f46; border-color:#a7f3d0; }
+            #welcomeModal .chip.warning { background:#fff7ed; color:#b45309; border-color:#fde68a; }
+            #welcomeModal .chip.danger  { background:#fef2f2; color:#991b1b; border-color:#fecaca; }
+            #welcomeModal .chip.info    { background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+            /* Round dialog and header */
+            #welcomeModal .ps-modal-dialog { border-radius:24px; overflow:hidden; box-shadow: 0 18px 48px rgba(0,0,0,.18), 0 8px 24px rgba(0,0,0,.12); }
+            #welcomeModal .ps-modal-header { border-top-left-radius:24px; border-top-right-radius:24px; }
+            /* Softer backdrop with slight blur */
+            #welcomeModal .ps-modal-backdrop { background: rgba(15,23,42,.40); backdrop-filter: blur(3px); position: fixed; inset: 0; }
+            /* Subtle hover scale for CTAs */
+            #welcomeModal .cta-grid .btn:hover { transform: translateY(-1px); box-shadow: 0 10px 20px rgba(0,0,0,.08); }
+          </style>
+          <div class="mb-2">
+            <span class="chip role"><i class="fas fa-id-badge"></i> Rol: <?= View::e($roleLabel) ?></span>
+            <?php if ((int)$welcome === 1): ?><span class="chip first"><i class="fas fa-sparkles"></i> Primera vez aquí</span><?php else: ?><span class="chip back"><i class="fas fa-undo"></i> De vuelta</span><?php endif; ?>
+          </div>
+          <?php if ((int)$welcome === 1): ?>
+            <p class="lead mb-2">Gracias por iniciar sesión en <strong>PharmaSoft</strong>. Aquí tienes accesos directos y un resumen según tu rol.</p>
+          <?php else: ?>
+            <p class="lead mb-2">¡Nos alegra verte de nuevo! Usa estos atajos y recuerda tus funciones principales.</p>
+          <?php endif; ?>
+          <ul class="pl-3 mb-3">
+            <?php if ($roleLabel === 'Administrador'): ?>
+              <li>Gestiona productos, proveedores y usuarios del sistema.</li>
+              <li>Visualiza ventas, utilidades y reportes.</li>
+              <li>Configura parámetros y seguridad.</li>
+            <?php elseif ($roleLabel === 'Técnico'): ?>
+              <li>Registra ventas y consulta inventario.</li>
+              <li>Controla vencimientos y bajo stock.</li>
+              <li>Apoya la operación diaria.</li>
+            <?php else: ?>
+              <li>Consulta inventario y realiza operaciones permitidas por tu rol.</li>
+              <li>Accede al módulo de ventas y reportes básicos.</li>
+            <?php endif; ?>
+          </ul>
+          <div class="kpis">
+            <div class="kpi"><i class="fas fa-bell text-warning"></i><div><div class="font-weight-bold">Notificaciones</div><div id="wmNotifyText" class="text-muted small">Sin notificaciones</div></div></div>
+            <div class="kpi"><i class="fas fa-shopping-cart text-primary"></i><div><div class="font-weight-bold">Carrito</div><div id="wmCartText" class="text-muted small">Carrito vacío</div></div></div>
+          </div>
+          <div class="cta-grid mb-2">
+            <a href="<?= BASE_URL ?>/dashboard" class="btn btn-dash" id="wmGoDash"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+            <a href="<?= BASE_URL ?>/products" class="btn btn-products" id="wmGoProducts"><i class="fas fa-pills"></i> Productos</a>
+            <a href="<?= BASE_URL ?>/sales" class="btn btn-sales" id="wmGoSales"><i class="fas fa-cash-register"></i> Ventas</a>
+            <?php if ($isAdmin): ?>
+              <a href="<?= BASE_URL ?>/users" class="btn btn-users" id="wmGoUsers"><i class="fas fa-users"></i> Usuarios</a>
+            <?php endif; ?>
+            <a href="#" class="btn btn-notify" id="wmGoNotify"><i class="fas fa-bell"></i> Notificaciones</a>
+            <a href="#" class="btn btn-cart" id="wmGoCart"><i class="fas fa-shopping-cart"></i> Carrito</a>
+          </div>
+          <div class="tips">
+            <i class="fas fa-info-circle mr-1" aria-hidden="true"></i>
+            Puedes cerrar este mensaje con la X, presionando ESC o haciendo clic fuera.
+          </div>
+        </div>
+      </div>
+      <div class="ps-modal-footer d-flex justify-content-end">
+        <button type="button" class="btn btn-primary btn-sm" id="welcomeOkBtn"><i class="fas fa-check mr-1" aria-hidden="true"></i> Entendido</button>
+      </div>
+    </div>
+    <div class="ps-modal-backdrop" id="welcomeBackdrop"></div>
+  </div>
+  <script>
+    (function(){
+      try {
+        // Debug: log welcome flag to ensure view condition passed
+        console.log('PharmaSoft welcome flag:', <?= (int)$welcome ?>);
+        var m = document.getElementById('welcomeModal');
+        var btnX = document.getElementById('welcomeCloseBtn');
+        var btnOk = document.getElementById('welcomeOkBtn');
+        var bd = document.getElementById('welcomeBackdrop');
+        // Lock page scroll and interactions while modal is open
+        var _prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        function restorePage(){ document.body.style.overflow = _prevOverflow || ''; }
+        function preventScroll(e){ e.preventDefault(); e.stopPropagation(); return false; }
+        if (bd) {
+          ['wheel','touchmove','scroll'].forEach(function(ev){ bd.addEventListener(ev, preventScroll, { passive:false }); });
+        }
+        function close(){ if (!m) return; m.style.display='none'; restorePage(); }
+        if (btnX) btnX.addEventListener('click', close);
+        if (btnOk) btnOk.addEventListener('click', close);
+        if (bd) bd.addEventListener('click', function(e){ if (e.target === bd) close(); });
+        document.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
+
+        // Populate dynamic texts: notifications (detailed) and cart
+        try {
+          var wmNotifyText = document.getElementById('wmNotifyText');
+          if (wmNotifyText) {
+            var expiredCnt = <?= (int)($expired ?? 0) ?>;
+            var soonCnt    = <?= (int)($expiringSoon ?? 0) ?>;
+            var lowCnt     = <?= (int)($lowStock ?? 0) ?>;
+            var zeroCnt    = <?= (int)($zeroStock ?? 0) ?>;
+            var STOCK_DANGER = <?= defined('STOCK_DANGER') ? (int)STOCK_DANGER : 20 ?>;
+            var STOCK_WARN   = <?= defined('STOCK_WARN') ? (int)STOCK_WARN : 60 ?>;
+            var expiredDetails = <?php echo json_encode($expiredDetails ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+            var expiringDetails = <?php echo json_encode($expiringDetails ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+            var lowStockList = <?php echo json_encode($lowStockList ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+            var zeroStockList = <?php echo json_encode($zeroStockList ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+
+            function esc(t){ return (t||'').toString().replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
+
+            var html = '';
+            // Expired
+            if (expiredCnt > 0) {
+              html += '<div class="mb-1"><span class="badge badge-danger mr-1"><i class="fas fa-ban mr-1"></i>Vencidos: '+expiredCnt+'</span></div>';
+              var lines = [];
+              (expiredDetails||[]).slice(0,6).forEach(function(r){
+                var name = esc(r && (r.name||''));
+                var dn = parseInt(r && (r.days_over||0),10) || 0;
+                var dstr = esc(r && (r.d||''));
+                lines.push('<span class="chip danger" title="Vencido"><i class="fas fa-ban"></i> '+name+' · '+dn+'d'+(dstr?(' · '+dstr):'')+'</span>');
+              });
+              if (lines.length) html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">'+lines.join('')+'</div>';
+            }
+            // Expiring soon
+            if (soonCnt > 0) {
+              html += '<div class="mt-2 mb-1"><span class="badge badge-warning mr-1"><i class="fas fa-clock mr-1"></i>Por vencer (≤30d): '+soonCnt+'</span></div>';
+              var lines2 = [];
+              (expiringDetails||[]).slice(0,6).forEach(function(r){
+                var name = esc(r && (r.name||''));
+                var dl = parseInt(r && (r.days_left||0),10) || 0;
+                var dstr = esc(r && (r.d||''));
+                lines2.push('<span class="chip warning" title="Por vencer"><i class="fas fa-clock"></i> '+name+' · '+dl+'d'+(dstr?(' · '+dstr):'')+'</span>');
+              });
+              if (lines2.length) html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">'+lines2.join('')+'</div>';
+            }
+            // Low stock
+            if (lowCnt > 0) {
+              html += '<div class="mt-2 mb-1"><span class="badge badge-warning mr-1"><i class="fas fa-exclamation-triangle mr-1"></i>Stock</span></div>';
+              var lines3 = [];
+              (lowStockList||[]).slice(0,6).forEach(function(r){
+                var name = esc(r && (r.name||''));
+                var st = parseInt(r && (r.stock||0),10) || 0;
+                var sev = (st <= STOCK_DANGER) ? '<span class="text-danger font-weight-bold">stock bajo</span>'
+                          : (st <= STOCK_WARN) ? '<span class="text-warning font-weight-bold">stock en advertencia</span>'
+                          : '<span class="text-success">stock OK</span>';
+                var cls = (st <= STOCK_DANGER) ? 'danger' : (st <= STOCK_WARN) ? 'warning' : 'success';
+                var ico = (st <= STOCK_DANGER) ? 'fa-exclamation-circle' : (st <= STOCK_WARN) ? 'fa-exclamation-triangle' : 'fa-check';
+                lines3.push('<span class="chip '+cls+'" title="Stock: '+st+'"><i class="fas '+ico+'"></i> '+name+' · '+st+'</span>');
+              });
+              if (lines3.length) html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">'+lines3.join('')+'</div>';
+            }
+
+            // Zero stock (Sin stock)
+            if (zeroCnt > 0) {
+              html += '<div class="mt-2 mb-1"><span class="badge badge-danger mr-1"><i class="fas fa-times-circle mr-1"></i>Sin stock: '+zeroCnt+'</span></div>';
+              var lines0 = [];
+              (zeroStockList||[]).slice(0,6).forEach(function(r){
+                var name = esc(r && (r.name||''));
+                lines0.push('<span class="chip danger" title="Sin stock"><i class="fas fa-times-circle"></i> '+name+' · 0</span>');
+              });
+              if (lines0.length) html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">'+lines0.join('')+'</div>';
+            }
+
+            wmNotifyText.innerHTML = html || 'Sin notificaciones';
+          }
+        } catch(_){ }
+        try {
+          var wmCartText = document.getElementById('wmCartText');
+          var cnt = 0;
+          var uid = <?= (int)$uid ?>;
+          var nsKey = 'pharmasoft_sales_draft_' + uid;
+          var chips = [];
+          function esc(t){ return (t||'').toString().replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
+          try {
+            var rawNS = localStorage.getItem(nsKey);
+            if (!rawNS) {
+              var legacy = localStorage.getItem('pharmasoft_sales_draft');
+              if (legacy) { localStorage.setItem(nsKey, legacy); }
+              rawNS = localStorage.getItem(nsKey);
+            }
+            var arr = rawNS ? JSON.parse(rawNS||'[]')||[] : [];
+            if (Array.isArray(arr)) {
+              cnt = arr.length;
+              for (var i=0;i<Math.min(arr.length,6);i++) {
+                var it = arr[i]||{};
+                var nm = esc((it.name||'').toString());
+                var q = parseInt(it.qty||0,10)||0;
+                if (nm) chips.push('<span class="chip success" title="En carrito"><i class="fas fa-check"></i> '+nm+(q?(' · x'+q):'')+'</span>');
+              }
+            }
+          } catch(e){ cnt = 0; chips = []; }
+          if (wmCartText) {
+            wmCartText.innerHTML = cnt>0
+              ? ('<div style="display:flex;flex-wrap:wrap;gap:6px;">'
+                 + '<span class="chip info"><i class="fas fa-shopping-cart"></i> '+cnt+' producto(s)</span>'
+                 + chips.join('')
+                 + (cnt>6 ? '<span class="chip info" title="Más">…</span>' : '')
+                 + '</div>')
+              : 'Carrito vacío';
+          }
+        } catch(_){ }
+
+        // Quick actions: open existing modals if available
+        var goNotify = document.getElementById('wmGoNotify');
+        if (goNotify) goNotify.addEventListener('click', function(e){ e.preventDefault(); try { var fab=document.getElementById('psNotifyFab'); if (fab) fab.click(); } catch(_){ } close(); });
+        var goCart = document.getElementById('wmGoCart');
+        if (goCart) goCart.addEventListener('click', function(e){ e.preventDefault(); try { var fab=document.getElementById('globalCartFab'); if (fab) fab.click(); } catch(_){ } close(); });
+      } catch(_){ }
+    })();
+  </script>
+<?php endif; ?>

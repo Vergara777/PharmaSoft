@@ -433,7 +433,7 @@
           var o = optsOrType || {}; o.position = 'top-end'; if (typeof o.timer === 'undefined') o.timer = 4000;
           return notify(o);
         }
-      } catch(_){}}
+      } catch(_){ }
       var o2 = (typeof optsOrType === 'string') ? { icon: optsOrType, title: maybeTitle||'', text: maybeText||'' } : (optsOrType||{});
       if (window.Swal && Swal.fire) {
         Swal.fire({ icon: o2.icon || 'info', title: o2.title || '', text: o2.text || '', position: 'top-end', toast: true, timer: (typeof o2.timer==='number'?o2.timer:4000), timerProgressBar: true, showConfirmButton: false, showClass: { popup: 'swal2-show' }, hideClass: { popup: 'swal2-hide' } });
@@ -474,8 +474,19 @@
       try { return new Intl.NumberFormat('es-CO', { style:'currency', currency:'COP', minimumFractionDigits:0, maximumFractionDigits:0 }).format(n||0); }
       catch(e){ var v = Math.round(n||0); return '$' + String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
     }
-    // Draft autosave
-    var DRAFT_KEY = 'pharmasoft_sales_draft';
+    // Draft autosave (per-user namespaced)
+    var uid = <?= (int)(\App\Helpers\Auth::id() ?? 0) ?>;
+    var DRAFT_KEY = 'pharmasoft_sales_draft_' + uid;
+    var SHARED = 'pharmasoft_sales_draft';
+    var LEGACY = 'pharmasoft_pending_cart';
+    function migrateDraft(){
+      try {
+        var shared = localStorage.getItem(SHARED);
+        if (shared && !localStorage.getItem(DRAFT_KEY)) { localStorage.setItem(DRAFT_KEY, shared); }
+        var old = localStorage.getItem(LEGACY);
+        if (old && !localStorage.getItem(DRAFT_KEY)) { localStorage.setItem(DRAFT_KEY, old); localStorage.removeItem(LEGACY); }
+      } catch(_){ }
+    }
     function serializeCart(){
       var items = [];
       body.querySelectorAll('tr').forEach(function(tr){
@@ -522,6 +533,7 @@
     }
     function loadDraft(){
       try {
+        migrateDraft();
         var raw = localStorage.getItem(DRAFT_KEY);
         if (!raw) return 0;
         var arr = JSON.parse(raw||'[]')||[];

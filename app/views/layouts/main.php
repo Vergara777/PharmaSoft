@@ -257,10 +257,12 @@
     .ps-navbar .nav-link i { opacity: .9; font-size: 15px; margin-right: 6px; }
     .ps-navbar .nav-link:hover { color: #111827; background: rgba(59,130,246,.10); }
     .ps-navbar .nav-link.active { color: #0f172a; background: rgba(59,130,246,.18); box-shadow: inset 0 0 0 1px rgba(59,130,246,.35); }
-    /* Profile chip */
-    .user-menu > .nav-link { display: inline-flex; align-items: center; gap: 8px; }
-    .user-menu > .nav-link .user-image { width: 28px; height: 28px; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
-    .user-menu > .nav-link span { font-weight: 700; color: #111827; }
+    /* Profile chip (pastel red) */
+    .user-menu > .nav-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 10px; border-radius: 999px; background: linear-gradient(135deg, #ffe4e6, #fecaca); border: 1px solid #fecaca; box-shadow: 0 2px 10px rgba(239,68,68,.14); transition: background .2s ease, box-shadow .2s ease, transform .05s ease; }
+    .user-menu > .nav-link:hover { background: linear-gradient(135deg, #fecaca, #fbcfe8); box-shadow: 0 4px 14px rgba(244,63,94,.22); }
+    .user-menu > .nav-link:active { transform: translateY(1px); }
+    .user-menu > .nav-link .user-image { width: 28px; height: 28px; border: 2px solid #fecaca; box-shadow: 0 2px 6px rgba(239,68,68,.18); }
+    .user-menu > .nav-link span { font-weight: 700; color: #0f172a; }
     /* Dropdown redesign */
     .ps-user-dd { width: 320px; overflow: hidden; border-radius: 12px; box-shadow: 0 18px 50px rgba(0,0,0,.18); }
     .ps-user-dd-header { background: linear-gradient(135deg,#1d4ed8,#3b82f6); text-align:center; padding: 18px 16px; }
@@ -296,6 +298,26 @@
       .sidebar-hidden .ps-topbrand .name, .sidebar-hidden .ps-topbrand .icon { animation: none; }
     }
     .sidebar-hidden .ps-topbrand { display: inline-flex; }
+    /* Dark mode toggles and safe overrides */
+    .ps-theme-btn { border: 0; background: transparent; padding: 6px 10px; border-radius: 10px; color: #374151; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+    .ps-theme-btn i { font-size: 14px; }
+    .ps-theme-btn:hover { background: rgba(59,130,246,.10); color: #111827; }
+    body.dark-mode .ps-navbar.navbar { background: #0b1220 !important; color: #e5e7eb; box-shadow: 0 1px 0 rgba(255,255,255,.06); }
+    body.dark-mode .ps-navbar .nav-link { color: #e5e7eb; }
+    body.dark-mode .ps-navbar .nav-link:hover { color: #fff; background: rgba(59,130,246,.22); }
+    body.dark-mode .ps-navbar .nav-link.active { color: #fff; background: rgba(59,130,246,.28); box-shadow: inset 0 0 0 1px rgba(59,130,246,.45); }
+    body.dark-mode .ps-user-dd { background: #0f172a; color: #e5e7eb; }
+    body.dark-mode .ps-user-dd .dd-actions { background: #0f172a; }
+    body.dark-mode .ps-user-dd-header { background: linear-gradient(135deg,#7f1d1d,#b91c1c); }
+    body.dark-mode .dropdown-menu { background: #0f172a; color: #e5e7eb; border-color: rgba(255,255,255,.08); }
+    body.dark-mode .dropdown-item { color: #e5e7eb; }
+    body.dark-mode .dropdown-item:hover { background: rgba(59,130,246,.20); color: #fff; }
+    body.dark-mode .ps-modal-dialog { background: #111827; color: #e5e7eb; }
+    body.dark-mode .ps-modal-header { border-color: rgba(255,255,255,.08); background: #0b1220; }
+    body.dark-mode .ps-modal-footer { border-color: rgba(255,255,255,.08); background: #0b1220; }
+    body.dark-mode .ps-co-time { background: rgba(17,24,39,.95); color: #e5e7eb; border-color: rgba(255,255,255,.08); }
+    body.dark-mode .cart-fab { background: #2563eb; }
+    body.dark-mode .notify-fab { background: #f59e0b; color: #111827; }
   </style>
 </head>
 <body class="hold-transition sidebar-mini ps-no-anim<?= $isLogin ? ' login-body' : ' layout-navbar-fixed layout-fixed' ?><?= $sidebarHidden ? ' sidebar-hidden sidebar-collapse' : '' ?>">
@@ -567,6 +589,35 @@
     document.addEventListener('shown.lte.pushmenu', setHeaderH);
     document.addEventListener('collapsed.lte.pushmenu', setHeaderH);
   })();
+  // Theme: dark/light toggle with persistence and system preference fallback
+  (function themeInit(){
+    const KEY = 'psTheme';
+    const body = document.body;
+    function updateBtn(mode){
+      const btn = document.getElementById('psThemeToggle'); if (!btn) return;
+      const icon = btn.querySelector('i'); const label = btn.querySelector('span');
+      if (icon) icon.className = 'fas ' + (mode === 'dark' ? 'fa-sun' : 'fa-moon');
+      if (label) label.textContent = (mode === 'dark' ? 'Modo claro' : 'Modo oscuro');
+      btn.setAttribute('aria-pressed', mode === 'dark' ? 'true' : 'false');
+    }
+    function apply(mode){ body.classList.toggle('dark-mode', mode === 'dark'); updateBtn(mode); }
+    function read(){ try { return localStorage.getItem(KEY); } catch(_) { return null; } }
+    function write(v){ try { localStorage.setItem(KEY, v); } catch(_){} }
+    function sysPref(){ try { return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; } catch(_) { return 'light'; } }
+    let saved = read(); let mode = saved || sysPref(); apply(mode);
+    function toggle(){ const current = body.classList.contains('dark-mode') ? 'dark' : 'light'; const next = current === 'dark' ? 'light' : 'dark'; apply(next); write(next); }
+    window.psThemeToggleClick = function(e){ if (e) e.preventDefault(); toggle(); return false; };
+    const btn = document.getElementById('psThemeToggle');
+    if (btn) btn.addEventListener('click', function(e){ e.preventDefault(); toggle(); });
+    // Delegated fallback in case the button is re-rendered
+    document.addEventListener('click', function(e){ var t = e.target && (e.target.closest ? e.target.closest('#psThemeToggle') : null); if (t) { e.preventDefault(); toggle(); } });
+    if (window.matchMedia) {
+      try {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        mq.addEventListener('change', function(ev){ if (!read()) apply(ev.matches ? 'dark' : 'light'); });
+      } catch(_){}
+    }
+  })();
 </script>
 <script>
   // SweetAlert2 Toast (enhanced) if available
@@ -742,8 +793,10 @@
   // Global Cart (floating) only when authenticated and not on login page
   <?php if (!$isLogin && $isAuth): ?>
   (function globalCart(){
-    var KEY = 'pharmasoft_sales_draft';
+    var uid = <?= (int)(\App\Helpers\Auth::id() ?? 0) ?>;
+    var KEY = 'pharmasoft_sales_draft_' + uid;
     var LEGACY = 'pharmasoft_pending_cart';
+    var SHARED = 'pharmasoft_sales_draft';
     var fab = document.getElementById('globalCartFab');
     var fabCount = document.getElementById('globalCartCount');
     var modal = document.getElementById('globalCartModal');
@@ -764,7 +817,16 @@
     }
 
     function fmt(n){ try { return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0}).format(n||0); } catch(e){ var v=Math.round(n||0); return '$'+String(v).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); } }
-    function migrate(){ try { var old = localStorage.getItem(LEGACY); if (old && !localStorage.getItem(KEY)) { localStorage.setItem(KEY, old); localStorage.removeItem(LEGACY); } } catch(_){} }
+    function migrate(){
+      try {
+        // Prefer migrating from shared draft key if exists
+        var shared = localStorage.getItem(SHARED);
+        if (shared && !localStorage.getItem(KEY)) { localStorage.setItem(KEY, shared); }
+        // Also migrate from older legacy key
+        var old = localStorage.getItem(LEGACY);
+        if (old && !localStorage.getItem(KEY)) { localStorage.setItem(KEY, old); localStorage.removeItem(LEGACY); }
+      } catch(_){ }
+    }
     function read(){ migrate(); try { var raw = localStorage.getItem(KEY); var arr = raw ? JSON.parse(raw||'[]')||[] : []; return Array.isArray(arr)?arr:[]; } catch(_){ return []; } }
     function write(arr){ try { if (arr && arr.length) localStorage.setItem(KEY, JSON.stringify(arr)); else localStorage.removeItem(KEY); } catch(_){} }
     function total(arr){ var t=0; (arr||[]).forEach(function(it){ var q=parseInt(it.qty||0,10)||0; var p=Math.round(parseFloat(it.unit_price||0)||0); t+=q*p; }); return t; }
