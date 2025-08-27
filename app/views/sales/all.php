@@ -17,23 +17,30 @@
             <div class="input-group-append"><button class="btn btn-outline-secondary"><i class="fas fa-search mr-1" aria-hidden="true"></i> Buscar</button></div>
           </div>
         </form>
-        <!-- Rango de fechas + Exportar -->
-        <?php $today = (new \DateTimeImmutable('today', new \DateTimeZone('America/Bogota')))->format('Y-m-d'); ?>
-        <form class="form-inline mb-2" method="get" action="<?= BASE_URL ?>/sales/export" target="_blank" id="salesExportForm" data-no-loader="1" aria-label="Exportar Excel">
-          <div class="input-group input-group-sm mr-2">
+        <!-- Filtro por fecha para listado (todas) -->
+        <form class="form-inline mr-2 mb-2" method="get" action="<?= BASE_URL ?>/sales/all" aria-label="Filtrar por fecha">
+          <div class="input-group input-group-sm mr-1">
             <div class="input-group-prepend"><span class="input-group-text">Desde</span></div>
-            <input type="date" class="form-control" name="from" value="<?= View::e($_GET['from'] ?? $today) ?>">
-            <div class="input-group-prepend"><span class="input-group-text">Hasta</span></div>
-            <input type="date" class="form-control" name="to" value="<?= View::e($_GET['to'] ?? $today) ?>">
+            <input type="date" class="form-control" name="from" value="<?= View::e($_GET['from'] ?? '') ?>" aria-label="Fecha desde">
           </div>
+          <div class="input-group input-group-sm mr-1">
+            <div class="input-group-prepend"><span class="input-group-text">Hasta</span></div>
+            <input type="date" class="form-control" name="to" value="<?= View::e($_GET['to'] ?? '') ?>" aria-label="Fecha hasta">
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm mr-1" title="Filtrar por fecha"><i class="fas fa-filter mr-1" aria-hidden="true"></i> Filtrar por fecha</button>
+          <button type="button" id="btnAllSalesToday" class="btn btn-outline-secondary btn-sm mr-1" title="Hoy"><i class="fas fa-calendar-day mr-1" aria-hidden="true"></i> Hoy</button>
+          <button type="button" id="btnAllSalesClear" class="btn btn-outline-secondary btn-sm" title="Limpiar filtros"><i class="fas fa-eraser mr-1" aria-hidden="true"></i> Limpiar</button>
+        </form>
+        <!-- Exportar Excel (usa el rango del filtro de arriba) -->
+        <div class="form-inline mb-2" aria-label="Exportar Excel">
           <div class="custom-control custom-checkbox mr-2">
-            <input class="custom-control-input" type="checkbox" id="expAll" name="all" value="1">
+            <input class="custom-control-input" type="checkbox" id="expAll" value="1">
             <label class="custom-control-label" for="expAll">Todas</label>
           </div>
-          <button class="btn btn-success btn-sm" type="submit" title="Exportar a Excel">
+          <a href="#" id="btnAllSalesExport" class="btn btn-success btn-sm" title="Exportar a Excel">
             <i class="fas fa-file-excel mr-1" aria-hidden="true"></i> Exportar Excel
-          </button>
-        </form>
+          </a>
+        </div>
         <div class="btn-group ml-2 mb-2" role="group">
           <a href="<?= BASE_URL ?>/sales/create" class="btn btn-primary btn-sm"><i class="fas fa-plus mr-1" aria-hidden="true"></i> Nueva venta</a>
         </div>
@@ -147,16 +154,89 @@
 <?php endif; ?>
 
 <script>
-  // Toggle rango vs todas
+  // Export: usa fechas del filtro y "Todas" si está marcado; descarga por iframe (sin overlay) + spinner rápido en botón
   (function(){
-    var form = document.getElementById('salesExportForm'); if (!form) return;
-    var ch = form.querySelector('#expAll');
-    var f = form.querySelector('input[name="from"]');
-    var t = form.querySelector('input[name="to"]');
-    function sync(){
-      var all = ch && ch.checked;
-      if (f) f.disabled = !!all; if (t) t.disabled = !!all;
+    function buildExportUrl(){
+      var url = '<?= BASE_URL ?>/sales/export';
+      try {
+        var filterForm = document.querySelector('form[action$="/sales/all"][aria-label="Filtrar por fecha"]');
+        var from = filterForm ? (filterForm.querySelector('input[name="from"]').value || '') : '';
+        var to = filterForm ? (filterForm.querySelector('input[name="to"]').value || '') : '';
+        var all = document.getElementById('expAll');
+        var p = [];
+        if (all && all.checked) { p.push('all=1'); }
+        else {
+          if (from) p.push('from=' + encodeURIComponent(from));
+          if (to) p.push('to=' + encodeURIComponent(to));
+        }
+        if (p.length) url += '?' + p.join('&');
+      } catch(_){ }
+      return url;
     }
-    if (ch){ ch.addEventListener('change', sync); sync(); }
+    function setBtnLoading(btn, isLoading){
+      if (!btn) return;
+      if (isLoading) {
+        if (!btn._origHtml) btn._origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.classList.add('disabled');
+        var label = btn.getAttribute('data-loading') || 'Exportando…';
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm mr-1" role="status" aria-hidden="true"></span>' + label;
+      } else {
+        btn.disabled = false;
+        btn.classList.remove('disabled');
+        if (btn._origHtml) btn.innerHTML = btn._origHtml;
+      }
+    }
+    function startIframeDownload(href, anchor){
+      var iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.setAttribute('aria-hidden','true');
+      var restored = false;
+      function restore(){ if (restored) return; restored = true; setBtnLoading(anchor, false); }
+      var done = function(){ try { iframe.remove(); } catch(_){ } restore(); };
+      iframe.onload = done; iframe.onerror = done;
+      document.body.appendChild(iframe);
+      iframe.src = href;
+      setTimeout(restore, 1500);
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      var btn = document.getElementById('btnAllSalesExport');
+      if (btn) {
+        btn.setAttribute('data-loading','Exportando…');
+        btn.addEventListener('click', function(e){
+          e.preventDefault();
+          try {
+            setBtnLoading(btn, true);
+            startIframeDownload(buildExportUrl(), btn);
+          } catch(_){ setBtnLoading(btn, false); }
+        });
+      }
+    });
+  })();
+  // Acciones rápidas: Hoy / Limpiar para el listado (todas)
+  (function(){
+    function fmt(n){ return (n < 10 ? '0' + n : '' + n); }
+    function todayYMD(){
+      var d = new Date(<?= json_encode(date('Y-m-d')) ?>);
+      var y = d.getFullYear(); var m = fmt(d.getMonth()+1); var da = fmt(d.getDate());
+      return y + '-' + m + '-' + da;
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      var form = document.querySelector('form[action$="/sales/all"][aria-label="Filtrar por fecha"]');
+      var inpFrom = form ? form.querySelector('input[name="from"]') : null;
+      var inpTo = form ? form.querySelector('input[name="to"]') : null;
+      var btnToday = document.getElementById('btnAllSalesToday');
+      var btnClear = document.getElementById('btnAllSalesClear');
+      if (btnToday && form && inpFrom && inpTo) {
+        btnToday.addEventListener('click', function(){
+          try { var t = todayYMD(); inpFrom.value = t; inpTo.value = t; form.submit(); } catch(_){ }
+        });
+      }
+      if (btnClear && form && inpFrom && inpTo) {
+        btnClear.addEventListener('click', function(){
+          try { inpFrom.value = ''; inpTo.value = ''; form.submit(); } catch(_){ }
+        });
+      }
+    });
   })();
 </script>

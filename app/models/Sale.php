@@ -269,7 +269,7 @@ class Sale extends Model {
         $this->db->beginTransaction();
         try {
             // Check stock
-            $stmt = $this->db->prepare('SELECT stock, expires_at FROM products WHERE id = ? FOR UPDATE');
+            $stmt = $this->db->prepare('SELECT stock, expires_at, sku, name FROM products WHERE id = ? FOR UPDATE');
             $stmt->execute([$productId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$row) { throw new \RuntimeException('Producto no existe'); }
@@ -277,13 +277,21 @@ class Sale extends Model {
             $expiresAt = $row['expires_at'] ?? null;
             if ($qty <= 0) { throw new \RuntimeException('Cantidad inválida'); }
             if ($unitPrice < 0) { throw new \RuntimeException('Precio inválido'); }
-            if ($stock < $qty) { throw new \RuntimeException('Stock insuficiente'); }
+            if ($stock < $qty) {
+                $sku = trim((string)($row['sku'] ?? ''));
+                $name = trim((string)($row['name'] ?? ''));
+                $label = $sku !== '' ? ($sku . ' - ' . $name) : ($name !== '' ? $name : ('ID ' . $productId));
+                throw new \RuntimeException('Stock insuficiente para ' . $label . '. Disponible: ' . $stock . ', solicitado: ' . $qty . '.');
+            }
             // Block expired products
             if (!empty($expiresAt)) {
                 // Compare as dates (Y-m-d)
                 $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
                 if ($expiresAt < $today) {
-                    throw new \RuntimeException('El producto está vencido y no puede venderse');
+                    $sku = trim((string)($row['sku'] ?? ''));
+                    $name = trim((string)($row['name'] ?? ''));
+                    $label = $sku !== '' ? ($sku . ' - ' . $name) : ($name !== '' ? $name : ('ID ' . $productId));
+                    throw new \RuntimeException('Producto vencido: ' . $label . '. No puede venderse.');
                 }
             }
 
@@ -367,7 +375,7 @@ class Sale extends Model {
             $total = 0.0;
             $insItem = $this->db->prepare('INSERT INTO sale_items (sale_id, product_id, qty, unit_price, unit_cost, line_total) VALUES (?,?,?,?,?,?)');
             $updStock = $this->db->prepare('UPDATE products SET stock = stock - ? WHERE id = ?');
-            $selProd = $this->db->prepare('SELECT stock, expires_at, cost FROM products WHERE id = ? FOR UPDATE');
+            $selProd = $this->db->prepare('SELECT stock, expires_at, cost, sku, name FROM products WHERE id = ? FOR UPDATE');
 
             foreach ($norm as $it) {
                 $selProd->execute([$it['product_id']]);
@@ -376,10 +384,20 @@ class Sale extends Model {
                 $stock = (int)$row['stock'];
                 $expiresAt = $row['expires_at'] ?? null;
                 $unitCost = isset($row['cost']) ? (float)$row['cost'] : 0.0;
-                if ($stock < $it['qty']) { throw new \RuntimeException('Stock insuficiente para un ítem'); }
+                if ($stock < $it['qty']) {
+                    $sku = trim((string)($row['sku'] ?? ''));
+                    $name = trim((string)($row['name'] ?? ''));
+                    $label = $sku !== '' ? ($sku . ' - ' . $name) : ($name !== '' ? $name : ('ID ' . (int)$it['product_id']));
+                    throw new \RuntimeException('Stock insuficiente para ' . $label . '. Disponible: ' . $stock . ', solicitado: ' . (int)$it['qty'] . '.');
+                }
                 if (!empty($expiresAt)) {
                     $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
-                    if ($expiresAt < $today) { throw new \RuntimeException('Un producto está vencido y no puede venderse'); }
+                    if ($expiresAt < $today) {
+                        $sku = trim((string)($row['sku'] ?? ''));
+                        $name = trim((string)($row['name'] ?? ''));
+                        $label = $sku !== '' ? ($sku . ' - ' . $name) : ($name !== '' ? $name : ('ID ' . (int)$it['product_id']));
+                        throw new \RuntimeException('Producto vencido: ' . $label . '. No puede venderse.');
+                    }
                 }
 
                 $line = $it['qty'] * $it['unit_price'];

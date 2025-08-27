@@ -30,6 +30,9 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.7/dist/sweetalert2.min.css">
+  <!-- Choices.js for enhanced select dropdowns (scrollable, searchable) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
   <style>
     /* Loading Overlay */
     .app-loading-overlay { position: fixed; inset: 0; background: rgba(17,24,39,.45); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); z-index: 5005; display: none; align-items: center; justify-content: center; }
@@ -102,6 +105,30 @@
     .ps-co-time .fa-clock { color: #3c8dbc; }
     /* Compact mini loader */
     .ps-mini-loader { position: fixed; right: 16px; bottom: 16px; z-index: 4006; background: #0b1220; color: #e5e7eb; padding: 8px 12px; border-radius: 10px; display: none; align-items: center; gap: 8px; box-shadow: 0 16px 40px rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.06); }
+    /* UX: Hide bottom-right mini loader completely */
+    #psMiniLoader { display: none !important; }
+    /* Choices.js dropdown UX improvements (contained, scrollable) */
+    .choices { position: relative; }
+    .choices__inner { min-height: 40px; }
+    .choices.is-open .choices__list--dropdown { z-index: 5005; }
+    /* Cap height and force vertical scroll on any dropdown list */
+    .choices__list--dropdown,
+    .choices__list[role="listbox"],
+    .choices__list--dropdown .choices__list {
+      max-height: 260px !important;
+      overflow-y: auto !important;
+      -webkit-overflow-scrolling: touch;
+    }
+    /* Allow long option labels to wrap to next line */
+    .choices__list--dropdown .choices__item {
+      white-space: normal !important;
+      overflow: visible;
+      text-overflow: clip;
+      word-break: break-word;
+      line-height: 1.25;
+    }
+    /* Do not show disabled (placeholder) items inside dropdown */
+    .choices__list--dropdown .choices__item--disabled { display: none !important; }
     .ps-mini-spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.15); border-top-color: #3b82f6; border-radius: 50%; animation: spin .9s linear infinite; }
     /* Reduced motion respect */
     @media (prefers-reduced-motion: reduce) {
@@ -110,14 +137,76 @@
       .app-loading-overlay.fade-exit-active { transition: none; }
     }
     /* Floating cart button */
-    .cart-fab { position: fixed; right: 20px; bottom: 20px; z-index: 3045; border: none; border-radius: 50%; width: 56px; height: 56px; background: #3c8dbc; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.25); display: inline-flex; align-items: center; justify-content: center; }
+    .cart-fab { position: fixed; right: 20px; bottom: 20px; z-index: 3045; border: none; border-radius: 50%; width: 64px; height: 64px; background: #3c8dbc; color: #fff; box-shadow: 0 8px 22px rgba(0,0,0,.28); display: inline-flex; align-items: center; justify-content: center; animation: ps-fab-float 4s ease-in-out infinite, ps-fab-pulse 1.2s ease-in-out infinite, ps-fab-glow 6s ease-in-out infinite; }
     .cart-fab:hover { background: #357ea8; }
-    .cart-fab .fa-shopping-cart { font-size: 1.25rem; }
+    .cart-fab .fa-shopping-cart { font-size: 1.4rem; }
     .cart-fab-badge { position: absolute; top: -6px; right: -6px; border-radius: 10px; font-weight: 700; }
+    /* Floating notifications button */
+    .notify-fab { position: fixed; right: 20px; bottom: 94px; z-index: 3046; border: none; border-radius: 50%; width: 64px; height: 64px; background: #f59e0b; color: #111827; box-shadow: 0 8px 22px rgba(0,0,0,.28); display: inline-flex; align-items: center; justify-content: center; animation: ps-fab-float 4s ease-in-out infinite, ps-fab-pulse 1.2s ease-in-out infinite, ps-notify-rgb 4s ease-in-out infinite; }
+    .notify-fab:hover { background: #d97706; color: #111827; }
+    .notify-fab .fa-bell { font-size: 1.4rem; }
+    .notify-fab-badge { position: absolute; top: -6px; right: -6px; border-radius: 10px; font-weight: 700; }
+    /* Notifications modal content design */
+    .notify-section { border-radius: 12px; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,.08); margin: 12px; border: 1px solid #eee; }
+    .notify-section .ns-header { padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; color: #111; }
+    .notify-section .ns-header .title { display: flex; align-items: center; font-weight: 700; }
+    .notify-section .ns-header .title i { margin-right: 8px; }
+    .notify-section .ns-header .count { font-weight: 700; opacity: .8; }
+    .notify-section.ns-low .ns-header { background: linear-gradient(90deg,#fff7ed,#fde68a); }
+    .notify-section.ns-expired .ns-header { background: linear-gradient(90deg,#fef2f2,#fecaca); }
+    .notify-section.ns-soon .ns-header { background: linear-gradient(90deg,#fff7ed,#fde68a); }
+    .notify-section .ns-list .notify-item { display:flex; align-items:center; justify-content:space-between; padding: 10px 14px; border-top: 1px solid #f1f1f1; }
+    .notify-section .ns-list .notify-item:hover { background: #fafafa; }
+    .notify-section .ns-list .left { display:flex; align-items:center; }
+    .notify-section .ns-list .left .name { font-weight:600; }
+    .notify-section .ns-list .left .sku { margin-left:8px; color:#6b7280; font-size:.85rem; }
+    .notify-section .ns-list .right { display:flex; gap:6px; align-items:center; }
+    .chip { display:inline-flex; align-items:center; padding: 2px 8px; border-radius: 999px; font-size: .75rem; font-weight: 600; border: 1px solid transparent; }
+    .chip-info { background:#ebf5ff; color:#1d4ed8; border-color:#bfdbfe; }
+    .chip-warn { background:#fff7ed; color:#b45309; border-color:#fde68a; }
+    .chip-danger { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+    .chip-emph { font-size: .78rem; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+    .chip-emph.chip-warn { background:#fffbeb; color:#92400e; border-color:#f59e0b; }
+    .chip-emph.chip-danger { background:#fff1f2; color:#7f1d1d; border-color:#ef4444; }
+    .text-amber-strong { color: #f59e0b !important; }
+
+    /* Subtle floating + glow animations for FABs */
+    @keyframes ps-fab-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+    @keyframes ps-fab-float-slow { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+    @keyframes ps-fab-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+    @keyframes ps-fab-glow {
+      0%   { box-shadow: 0 6px 16px rgba(0,0,0,.25), 0 0 10px rgba(255,0,128,.12), 0 0 20px rgba(0,200,255,.10); }
+      50%  { box-shadow: 0 6px 16px rgba(0,0,0,.25), 0 0 12px rgba(255,200,0,.14), 0 0 24px rgba(64,224,208,.12); }
+      100% { box-shadow: 0 6px 16px rgba(0,0,0,.25), 0 0 10px rgba(128,0,255,.12), 0 0 20px rgba(0,255,200,.10); }
+    }
+    /* RGB side glow for notification button (stronger) */
+    @keyframes ps-notify-rgb {
+      0% {
+        box-shadow:
+          0 8px 22px rgba(0,0,0,.28),
+          -6px 0 18px rgba(255, 0, 128, .55),
+          6px 0 18px rgba(0, 200, 255, .55);
+      }
+      50% {
+        box-shadow:
+          0 8px 22px rgba(0,0,0,.28),
+          -6px 0 22px rgba(255, 200, 0, .65),
+          6px 0 22px rgba(64, 224, 208, .65);
+      }
+      100% {
+        box-shadow:
+          0 8px 22px rgba(0,0,0,.28),
+          -6px 0 18px rgba(128, 0, 255, .55),
+          6px 0 18px rgba(0, 255, 200, .55);
+      }
+    }
+    .chip-muted { background:#f3f4f6; color:#374151; border-color:#e5e7eb; }
     /* Lightweight modal (global) */
-    .ps-modal { position: fixed; inset: 0; z-index: 3050; display: none; }
+    .ps-modal { position: fixed; inset: 0; z-index: 3050; display: none; opacity: 0; transition: opacity .65s ease; }
+    .ps-modal.ps-show { opacity: 1; }
     .ps-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.45); }
-    .ps-modal-dialog { position: relative; background: #fff; z-index: 1; max-width: 860px; width: 92%; margin: 40px auto; border-radius: 8px; box-shadow: 0 16px 40px rgba(0,0,0,.3); display: flex; flex-direction: column; max-height: calc(100vh - 80px); }
+    .ps-modal-dialog { position: relative; background: #fff; z-index: 1; max-width: 860px; width: 92%; margin: 40px auto; border-radius: 8px; box-shadow: 0 16px 40px rgba(0,0,0,.3); display: flex; flex-direction: column; max-height: calc(100vh - 80px); transform: translateY(12px) scale(.985); transition: transform .65s cubic-bezier(.16,1,.3,1); }
+    .ps-modal.ps-show .ps-modal-dialog { transform: translateY(0) scale(1); }
     .ps-modal-header { padding: 12px 16px; border-bottom: 1px solid #eee; display: flex; align-items: center; position: relative; }
     .ps-modal-body { padding: 0; max-height: calc(100vh - 190px); overflow: auto; }
     .ps-modal-footer { padding: 10px 16px; border-top: 1px solid #eee; background: #fafafa; }
@@ -329,6 +418,35 @@
   </div>
   <div class="ps-modal-backdrop" id="globalCartModalBackdrop"></div>
 </div>
+<!-- Global Floating Notifications Button and Modal -->
+<button id="psNotifyFab" class="notify-fab" title="Notificaciones" aria-label="Notificaciones">
+  <i class="fas fa-bell" aria-hidden="true"></i>
+  <span class="badge badge-danger notify-fab-badge" id="psNotifyBadge" style="display:none;">0</span>
+  <span class="sr-only">Notificaciones</span>
+</button>
+
+<div id="psNotifyModal" class="ps-modal" style="display:none;">
+  <div class="ps-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="psNotifyTitle">
+    <div class="ps-modal-header">
+      <h5 id="psNotifyTitle" class="mb-0 d-flex align-items-center">
+        <i class="fas fa-bell mr-2 text-amber-strong" aria-hidden="true"></i>
+        Notificaciones
+      </h5>
+      <button type="button" class="close" id="psNotifyClose" aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
+    </div>
+    <div class="ps-modal-body" id="psNotifyBody">
+      <div class="p-3 text-muted">Cargando notificaciones...</div>
+    </div>
+    <div class="ps-modal-footer d-flex justify-content-between align-items-center">
+      <small class="text-muted">Se actualiza al abrir.</small>
+      <div>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="psNotifyRefresh"><i class="fas fa-sync-alt mr-1"></i> Actualizar</button>
+        <button type="button" class="btn btn-primary btn-sm" id="psNotifyOk">Cerrar</button>
+      </div>
+    </div>
+  </div>
+  <div class="ps-modal-backdrop" id="psNotifyBackdrop"></div>
+</div>
 <?php endif; ?>
 <!-- Loading Overlay -->
 <div class="app-loading-overlay" id="appLoadingOverlay" aria-hidden="true">
@@ -408,22 +526,27 @@
       const t = e.target.closest && e.target.closest('#psToggleSidebar');
       if (t) onToggle(e);
     });
-    // Expand on hover (remove collapse) and collapse when cursor leaves the sidebar to anywhere else
+    // Expand on hover (remove collapse) and collapse when leaving the sidebar subtree
     (function(){
       const sb = document.querySelector('.main-sidebar');
       if (!sb) return;
       function isVisible(){ return !body.classList.contains('sidebar-hidden'); }
-      sb.addEventListener('mouseenter', function(){
-        if (isVisible()) body.classList.remove('sidebar-collapse');
+      // Expand as soon as cursor enters any child of the sidebar
+      sb.addEventListener('mouseover', function(){
+        if (isVisible()) {
+          body.classList.remove('sidebar-collapse');
+          body.classList.add('sidebar-open');
+        }
       });
-      // Use document-level mousemove to detect cursor outside sidebar reliably
-      document.addEventListener('mousemove', function(e){
+      // Collapse only when cursor leaves the entire sidebar subtree
+      sb.addEventListener('mouseout', function(e){
         if (!isVisible()) return;
-        // If already collapsed, nothing to do
-        if (body.classList.contains('sidebar-collapse')) return;
-        // Collapse when pointer is outside the sidebar
-        const inside = sb.contains(e.target);
-        if (!inside) body.classList.add('sidebar-collapse');
+        const toEl = e.relatedTarget;
+        const stillInside = toEl && sb.contains(toEl);
+        if (!stillInside) {
+          body.classList.add('sidebar-collapse');
+          body.classList.remove('sidebar-open');
+        }
       });
     })();
   })();
@@ -656,10 +779,12 @@
         if (btnGoCreateSale) btnGoCreateSale.style.display = isOnCreateSale() ? 'none' : '';
       } catch(_){ }
       if (!cnt){
-        var emptyHtml = '<div class="p-4 text-center">\
-          <div class="text-muted mb-3">No hay borrador de carrito.</div>';
+        var emptyHtml = '<div class="p-4 text-center text-muted">'
+          + '<div style="font-size:28px; margin-bottom:8px;"><i class="fas fa-shopping-cart"></i></div>'
+          + '<div style="font-weight:600;">No hay productos agregados al carrito</div>'
+          + '<div class="mt-1">Tu carrito está vacío.</div>';
         if (!isOnProducts()) {
-          emptyHtml += ' <a href="<?= BASE_URL ?>/products" class="btn btn-sm btn-primary"><i class="fas fa-pills mr-1"></i> Ir a productos</a>';
+          emptyHtml += '<div class="mt-3"><a href="<?= BASE_URL ?>/products" class="btn btn-sm btn-primary"><i class="fas fa-pills mr-1"></i> Ir a productos</a></div>';
         }
         emptyHtml += '</div>';
         if (mBody) mBody.innerHTML = emptyHtml;
@@ -701,25 +826,31 @@
         try { notify({ icon:'success', title:'Producto quitado del carrito' }); } catch(_){ }
       }); }); }
     }
-    function open(){ if (!modal) return; render(); modal.style.display='block'; document.body.style.overflow='hidden'; }
-    function close(){ if (!modal) return; modal.style.display='none'; document.body.style.overflow=''; }
+    function open(){
+      if (!modal) return;
+      render();
+      modal.style.display='block';
+      // smooth fade+slide
+      requestAnimationFrame(function(){ try { modal.classList.add('ps-show'); } catch(_){ } });
+      document.body.style.overflow='hidden';
+    }
+    function close(){
+      if (!modal) return;
+      try { modal.classList.remove('ps-show'); } catch(_){ }
+      var onEnd = function(){ try { modal.removeEventListener('transitionend', onEnd); } catch(_){ } modal.style.display='none'; };
+      try { modal.addEventListener('transitionend', onEnd); } catch(_){ setTimeout(onEnd, 650); }
+      document.body.style.overflow='';
+    }
     if (fab) fab.addEventListener('click', function(e){
       e.preventDefault();
-      try { if (window.loadingBar) loadingBar.start('Abriendo carrito...'); } catch(_){ try { bannerLoading(true, 'Abriendo carrito...'); } catch(__){} }
-      // Render and open immediately, then stop loader shortly after
+      // Open immediately and show a short toast only
       open();
-      setTimeout(function(){
-        try { if (window.loadingBar) loadingBar.stop(); else bannerLoading(false); } catch(_){ }
-        try { notify({ icon:'info', title:'Carrito abierto' }); } catch(_){ }
-      }, 600);
+      try { notify({ icon:'info', title:'Carrito abierto', timer: 2000, position:'top-end', toast:true }); } catch(_){ }
     });
     function closeWithFeedback(){
-      try { if (window.loadingBar) loadingBar.start('Cerrando carrito...'); } catch(_){ try { bannerLoading(true, 'Cerrando carrito...'); } catch(__){} }
+      // Close immediately and show a short toast only
       close();
-      setTimeout(function(){
-        try { if (window.loadingBar) loadingBar.stop(); else bannerLoading(false); } catch(_){ }
-        try { notify({ icon:'info', title:'Carrito cerrado' }); } catch(_){ }
-      }, 600);
+      try { notify({ icon:'info', title:'Carrito cerrado', timer: 2000, position:'top-end', toast:true }); } catch(_){ }
     }
     if (mClose) mClose.addEventListener('click', closeWithFeedback);
     if (mBackdrop) mBackdrop.addEventListener('click', function(e){ if (e.target===mBackdrop) closeWithFeedback(); });
@@ -970,8 +1101,23 @@
     if (!window.fetch) return;
     const _fetch = window.fetch.bind(window);
     window.fetch = function(input, init) {
-      try { loadingBar.start('Cargando...'); } catch(e){}
-      return _fetch(input, init).finally(() => { try { loadingBar.stop(); } catch(e){} });
+      try {
+        var noLoader = false;
+        try {
+          var headers = (init && init.headers) || (typeof input === 'object' && input && input.headers) || {};
+          // Normalize to Map-like lookup
+          if (headers && typeof headers.get === 'function') {
+            noLoader = headers.get('X-No-Loader') === '1';
+          } else {
+            var key;
+            for (key in headers) { if (key && key.toLowerCase() === 'x-no-loader') { noLoader = String(headers[key]) === '1'; break; } }
+          }
+        } catch(_e){}
+        if (!noLoader) { loadingBar.start('Cargando...'); }
+        return _fetch(input, init).finally(() => { try { if (!noLoader) loadingBar.stop(); } catch(e){} });
+      } catch(e){
+        return _fetch(input, init);
+      }
     }
   })();
 
@@ -1044,14 +1190,208 @@
       if (ok) window.location.href = el.getAttribute('href');
     }
   });
-</script>
-<?php $___fl = Flash::popAll(); if (!empty($___fl)): ?>
-<script>
-  (function(){
-    const msgs = <?php echo json_encode($___fl, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
-    msgs.forEach(m => notify({ icon: m.type || 'info', title: m.title || '', text: m.message || '', timer: (m.timer && m.timer > 0) ? m.timer : undefined, position: m.position || undefined }));
-  })();
-</script>
-<?php endif; ?>
+  
+  // END main app script block
+  </script>
+  
+  <!-- Notifications initializer -->
+  <script>
+    (function(){
+      var fab = document.getElementById('psNotifyFab');
+      var modal = document.getElementById('psNotifyModal');
+      var closeBtn = document.getElementById('psNotifyClose');
+      var okBtn = document.getElementById('psNotifyOk');
+      var refreshBtn = document.getElementById('psNotifyRefresh');
+      var backdrop = document.getElementById('psNotifyBackdrop');
+      var bodyEl = document.getElementById('psNotifyBody');
+      var badge = document.getElementById('psNotifyBadge');
+      var __psNotifyDebounce = null;
+      var __psNotifyLoading = false;
+      function setRefreshLoading(on){
+        __psNotifyLoading = !!on;
+        try {
+          if (!refreshBtn) return;
+          var icon = refreshBtn.querySelector('i');
+          refreshBtn.disabled = __psNotifyLoading;
+          if (icon) {
+            if (__psNotifyLoading) icon.classList.add('fa-spin'); else icon.classList.remove('fa-spin');
+          }
+        } catch(_){}
+      }
+      function openModal(){
+        if (!modal) return;
+        modal.style.display = 'block';
+        requestAnimationFrame(function(){ try { modal.classList.add('ps-show'); } catch(_){ } });
+      }
+      function closeModal(){
+        if (!modal) return;
+        try { modal.classList.remove('ps-show'); } catch(_){ }
+        var onEnd = function(){ try { modal.removeEventListener('transitionend', onEnd); } catch(_){ } modal.style.display = 'none'; };
+        try { modal.addEventListener('transitionend', onEnd); } catch(_){ setTimeout(onEnd, 650); }
+      }
+      function setBadge(n){ try { if (!badge) return; if (n > 0) { badge.style.display = ''; badge.textContent = n; } else { badge.style.display = 'none'; } } catch(_){} }
+      function parseYMD(s){
+        if (!s) return null;
+        // Accept formats like YYYY-MM-DD or with time
+        var d = new Date(s);
+        if (!isNaN(d)) return d;
+        // Fallback: try split
+        var m = String(s).match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+        if (m) { return new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10)); }
+        return null;
+      }
+      function daysFromToday(date){
+        try {
+          var d = (date instanceof Date) ? date : parseYMD(date);
+          if (!d) return null;
+          var today = new Date();
+          // normalize to local date at midnight
+          d.setHours(0,0,0,0);
+          today.setHours(0,0,0,0);
+          var diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+          return diff; // negative means overdue by |diff|
+        } catch(_){ return null; }
+      }
+      async function fetchAlerts(){
+        try {
+          setRefreshLoading(true);
+          const res = await fetch('<?= BASE_URL ?>/notifications/alerts', { headers: { 'Accept': 'application/json', 'X-No-Loader': '1' } });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          renderAlerts(data && data.ok ? data : { ok:false, low_stock:[], expired:[], expiring:[], threshold: 0 });
+        } catch(e) { renderError(e && e.message ? e.message : 'Error de red'); }
+        finally { setRefreshLoading(false); }
+      }
+      function chip(cls, text){ return '<span class="chip ' + cls + '">' + text + '</span>'; }
+      function rowItem(id, name, sku, chips){
+        var left = '<div class="left"><span class="name">' + name + '</span>' + (sku ? '<span class="sku">['+ sku +']</span>' : '') + '</div>';
+        var right = '<div class="right">' + chips.join('') + '</div>';
+        // If we have a valid id, render as an accessible anchor to product edit; otherwise a non-clickable div
+        var inner = left + right;
+        if (id != null && id !== '' && !isNaN(parseInt(id,10))) {
+          return '<a href="<?= BASE_URL ?>/products/edit/' + parseInt(id,10) + '" class="notify-item" role="link" tabindex="0" aria-label="Editar producto ' + (name||'') + '">' + inner + '</a>';
+        }
+        return '<div class="notify-item" role="group" aria-label="Producto">' + inner + '</div>';
+      }
+      function section(variant, icon, title, count, itemsHtml){
+        return (
+          '<div class="notify-section ' + variant + '">' +
+            '<div class="ns-header">' +
+              '<div class="title"><i class="' + icon + '"></i>' + title + '</div>' +
+              '<div class="count">' + count + '</div>' +
+            '</div>' +
+            '<div class="ns-list">' + (itemsHtml || '<div class="p-3 text-muted">Sin registros</div>') + '</div>' +
+          '</div>'
+        );
+      }
+      function renderAlerts(data){
+        try {
+          var low = data.low_stock || [];
+          var exp = data.expired || [];
+          var soon = data.expiring || [];
+          // UI policy: rojo < 20, amarillo 20..60, >60 no mostrar
+          var lowFiltered = low.filter(function(p){
+            var st = (p && p.stock != null) ? parseInt(p.stock,10) : null;
+            return (st != null && st < 61);
+          });
+          var lowHtml = lowFiltered.map(function(p){
+            var chips = [];
+            var st = (p && p.stock != null) ? parseInt(p.stock,10) : null;
+            if (st != null) {
+              if (st < 20) {
+                chips.push(chip('chip-danger chip-emph','Advertencia: este producto está próximo a acabar'));
+              } else {
+                chips.push(chip('chip-warn chip-emph','Advertencia: producto próximo a acabarse'));
+              }
+              chips.push(chip((st < 20 ? 'chip-danger' : 'chip-warn') + ' chip-emph','Quedan ' + st + ' unidades'));
+            }
+            return rowItem(p && p.id, (p.name||''), (p.sku||''), chips);
+          }).join('');
+          var expHtml = exp.map(function(p){
+            var chips = [ chip('chip-danger','Peligro'), chip('chip-danger','Vencido') ];
+            var dd = daysFromToday(p.expires_at);
+            if (dd != null && dd < 0) chips.push(chip('chip-danger', 'Hace ' + (Math.abs(dd)) + ' días'));
+            if (p.expires_at) chips.push(chip('chip-muted', p.expires_at));
+            return rowItem(p && p.id, (p.name||''), (p.sku||''), chips);
+          }).join('');
+          var soonHtml = soon.map(function(p){
+            var dd = daysFromToday(p.expires_at);
+            var chips = [ chip('chip-warn','Próximo a vencer') ];
+            if (dd != null && dd >= 0) chips.push(chip('chip-warn','Faltan ' + dd + ' días'));
+            if (p.expires_at) chips.push(chip('chip-muted', p.expires_at));
+            return rowItem(p && p.id, (p.name||''), (p.sku||''), chips);
+          }).join('');
+          var total = lowFiltered.length + exp.length + soon.length;
+          setBadge(total);
+          if (bodyEl) {
+            if (total === 0) {
+              bodyEl.innerHTML = '<div class="p-4 text-center text-muted">'
+                + '<div style="font-size:28px; margin-bottom:8px;"><i class="far fa-bell-slash"></i></div>'
+                + '<div style="font-weight:600;">Tu bandeja de notificaciones está vacía</div>'
+                + '<div class="mt-1">No tienes notificaciones por ahora.</div>'
+                + '</div>';
+            } else {
+              bodyEl.innerHTML = ''
+                + section('ns-low','fas fa-box-open text-warning','Próximo a agotar', lowFiltered.length, lowHtml)
+                + section('ns-expired','fas fa-times-circle text-danger','Vencidos', exp.length, expHtml)
+                + section('ns-soon','fas fa-hourglass-half text-warning','Próximo a vencer', soon.length, soonHtml);
+            }
+          }
+        } catch(e) { renderError('Error al procesar datos'); }
+      }
+      function renderError(msg){ if (bodyEl) bodyEl.innerHTML = '<div class="p-3 text-danger">' + (msg||'Error desconocido') + '</div>'; try { setBadge(0); } catch(_){} }
+      function debouncedFetch(){ try { if (__psNotifyDebounce) clearTimeout(__psNotifyDebounce); __psNotifyDebounce = setTimeout(fetchAlerts, 500); } catch(_){} }
+      function init(){
+        if (fab) fab.addEventListener('click', function(){ openModal(); fetchAlerts(); });
+        if (refreshBtn) refreshBtn.addEventListener('click', function(){ fetchAlerts(); });
+        if (closeBtn) closeBtn.addEventListener('click', closeModal);
+        if (okBtn) okBtn.addEventListener('click', closeModal);
+        if (backdrop) backdrop.addEventListener('click', closeModal);
+        // Fetch once on load for initial badge
+        fetchAlerts().catch(function(){});
+        // Refresh after any AJAX completes (e.g., ventas, productos)
+        if (window.jQuery && jQuery(document) && jQuery(document).ajaxStop) {
+          jQuery(document).ajaxStop(function(){ debouncedFetch(); });
+        }
+        // Confirm before navigating to edit product from notifications
+        if (bodyEl) {
+          bodyEl.addEventListener('click', function(e){
+            try {
+              var a = e.target && e.target.closest ? e.target.closest('a.notify-item') : null;
+              if (!a) return;
+              e.preventDefault();
+              var nameEl = a.querySelector('.name');
+              var pname = nameEl ? nameEl.textContent.trim() : 'producto';
+              var prompt = '¿Quieres editar el producto "' + pname + '"?';
+              var go = function(){ window.location.href = a.getAttribute('href'); };
+              var onCancel = function(){
+                try { if (typeof loadingBar !== 'undefined' && loadingBar && typeof loadingBar.stop === 'function') loadingBar.stop(); } catch(_){}
+                try { if (typeof bannerLoading === 'function') bannerLoading(false); } catch(_){}
+              };
+              if (typeof confirmAction === 'function') {
+                Promise.resolve(confirmAction({ text: prompt, icon: 'question', confirmText: 'Sí, editar' }))
+                  .then(function(ok){ if (ok) go(); else onCancel(); })
+                  .catch(function(){ onCancel(); });
+              } else {
+                if (window.confirm(prompt)) go(); else onCancel();
+              }
+            } catch(_){ /* no-op */ }
+          });
+        }
+        // Close on ESC
+        document.addEventListener('keydown', function(e){ if ((e.key === 'Escape' || e.key === 'Esc') && modal && modal.style.display === 'block') { closeModal(); } });
+      }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+    })();
+  </script>
+  
+  <?php $___fl = Flash::popAll(); if (!empty($___fl)): ?>
+  <script>
+    (function(){
+      const msgs = <?php echo json_encode($___fl, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+      msgs.forEach(m => notify({ icon: m.type || 'info', title: m.title || '', text: m.message || '', timer: (m.timer && m.timer > 0) ? m.timer : undefined, position: m.position || undefined }));
+    })();
+  </script>
+  <?php endif; ?>
 </body>
 </html>

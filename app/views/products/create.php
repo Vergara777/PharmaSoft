@@ -77,3 +77,31 @@
     }
   })();
 </script>
+<script>
+  // Enhance selects with Choices for better scrolling and UX
+  (function(){
+    if (!window.Choices) return;
+    try {
+      var selCat = document.querySelector('select[name="category_id"]');
+      if (selCat) {
+        new Choices(selCat, {
+          searchEnabled: true,
+          placeholderValue: 'Seleccionar categoría (desliza hacia abajo)',
+          searchPlaceholderValue: 'Escriba la categoría…',
+          itemSelectText: '',
+          allowHTML: true
+        });
+      }
+      var selSup = document.querySelector('select[name="supplier_id"]');
+      if (selSup) {
+        new Choices(selSup, {
+          searchEnabled: true,
+          placeholderValue: 'Seleccionar proveedor (desliza hacia abajo)',
+          searchPlaceholderValue: 'Escriba el proveedor…',
+          itemSelectText: '',
+          allowHTML: true
+        });
+      }
+    } catch(_){ }
+  })();
+</script>

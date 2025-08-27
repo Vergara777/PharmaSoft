@@ -75,3 +75,46 @@
     }
   })();
 </script>
+<style>
+  /* Local safety: cap dropdown height and enable internal scroll (Edit Product) */
+  .card .choices__list--dropdown,
+  .card .choices__list[role="listbox"],
+  .card .choices__list--dropdown .choices__list{
+    max-height: 260px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Keep control height uniform */
+  .card .choices__inner{ min-height: 40px; }
+  .card .choices[data-type*="select-one"] .choices__inner{ height: 40px; display:flex; align-items:center; }
+  .card .choices[data-type*="select-one"] .choices__list--single{ display:flex; align-items:center; }
+  .card .choices{ width:100%; }
+</style>
+<script>
+  // Enhance selects with Choices for better scrolling and UX
+  (function(){
+    if (!window.Choices) return;
+    try {
+      var selCat = document.querySelector('select[name="category_id"]');
+      if (selCat) {
+        new Choices(selCat, {
+          searchEnabled: true,
+          placeholderValue: 'Seleccionar categoría (desliza hacia abajo)',
+          searchPlaceholderValue: 'Escriba la categoría…',
+          itemSelectText: '',
+          allowHTML: true
+        });
+      }
+      var selSup = document.querySelector('select[name="supplier_id"]');
+      if (selSup) {
+        new Choices(selSup, {
+          searchEnabled: true,
+          placeholderValue: 'Seleccionar proveedor (desliza hacia abajo)',
+          searchPlaceholderValue: 'Escriba el proveedor…',
+          itemSelectText: '',
+          allowHTML: true
+        });
+      }
+    } catch(_){ }
+  })();
+</script>

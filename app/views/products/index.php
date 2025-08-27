@@ -88,8 +88,10 @@
           <div class="input-group-prepend"><span class="input-group-text"><i class="fas fa-tags" aria-hidden="true"></i></span></div>
           <select id="categoryFilter" name="category_id" class="form-control" title="Filtrar por categoría">
             <?php $__isNoCat = ($selCat === null); ?>
-            <option value="" disabled <?= $__isNoCat ? 'selected' : '' ?>>Categorías</option>
-            <option value="" <?= $__isNoCat ? '' : '' ?>>Todas</option>
+            <!-- Placeholder (not selectable), shown when no category selected -->
+            <option value="" disabled data-placeholder="true" hidden <?= $__isNoCat ? 'selected' : '' ?>>Seleccionar categoría</option>
+            <!-- Real 'Todas' option available for selection -->
+            <option value="">Todas</option>
             <?php foreach (($categories ?? []) as $c): $cid = (int)$c['id']; ?>
               <option value="<?= $cid ?>" <?= ($selCat === $cid ? 'selected' : '') ?>><?= htmlspecialchars($c['name'] ?? '', ENT_QUOTES, 'UTF-8') ?></option>
             <?php endforeach; ?>
@@ -162,7 +164,17 @@
       .products-toolbar .stock-legend{ white-space: nowrap; }
       .products-toolbar .stock-legend .badge{ font-size:.8rem; padding:.35em .55em; }
       .products-toolbar .search-group{ min-width:360px; }
-      .products-toolbar .category-group{ min-width:220px; }
+      .products-toolbar .category-group{ min-width:320px; display:flex; align-items:center; flex-wrap:nowrap; width:100%; white-space:nowrap; }
+      /* Make Choices fill the input group width */
+      .products-toolbar .category-group .input-group-prepend{ display:flex; align-items:center; flex: 0 0 auto; }
+      .products-toolbar .category-group .input-group-prepend .input-group-text{
+        height: var(--tb-h); padding-top:.25rem; padding-bottom:.25rem; border-right:0;
+      }
+      .products-toolbar .category-group .choices{ width:100%; min-width: 0; flex: 1 1 auto; margin-left:-1px; display:flex; align-self: stretch; }
+      .products-toolbar .category-group .choices__inner{
+        min-height: var(--tb-h); height: var(--tb-h); display:flex; align-items:center;
+        padding-top:.25rem; padding-bottom:.25rem; border-top-left-radius:0; border-bottom-left-radius:0;
+      }
       /* Altura uniforme para inputs, selects y botones */
       .products-toolbar .input-group.input-group-sm > .form-control,
       .products-toolbar .input-group.input-group-sm > .custom-select,
@@ -199,7 +211,7 @@
       @media (min-width: 768px){
         .products-toolbar{ flex-wrap: nowrap !important; }
         .products-toolbar .search-group{ flex: 1 1 520px; width: auto; }
-        .products-toolbar .category-group{ flex: 0 0 240px; }
+        .products-toolbar .category-group{ flex: 0 0 320px; }
         .products-toolbar [aria-label="Filtro por vencimiento"]{ flex: 0 0 260px; }
         .products-toolbar .stock-legend{ flex: 0 0 auto; }
         .products-toolbar .btn-group.ml-auto{ margin-left: auto !important; }
@@ -216,7 +228,24 @@
     <script>
       (function(){
         var sel = document.getElementById('categoryFilter');
-        if (sel) { sel.addEventListener('change', function(){ try { this.form.submit(); } catch(_){} }); }
+        if (sel) {
+          // Submit form on change (works with native select and Choices)
+          sel.addEventListener('change', function(){ try { this.form.submit(); } catch(_){} });
+          // Enhance with Choices for scrollable dropdown
+          if (window.Choices) {
+            try {
+              new Choices(sel, {
+                searchEnabled: true,
+                placeholder: true,
+                placeholderValue: 'Filtrar categoría',
+                searchPlaceholderValue: 'Escribe para filtrar…',
+                itemSelectText: '',
+                allowHTML: true,
+                shouldSort: false
+              });
+            } catch(_){ }
+          }
+        }
       })();
     </script>
   </div>
@@ -229,8 +258,28 @@
       $noProducts = empty($products);
       if ($noProducts):
         $hasQuery = !empty($q);
+        $ctxTitle = strtolower((string)($title ?? ''));
+        $expDays = isset($expiry) && ctype_digit((string)$expiry) ? (int)$expiry : null;
+        $stockCtx = isset($stock) ? (string)$stock : '';
+        // Defaults
         $msgTitle = $hasQuery ? 'Este producto no está en el inventario' : 'No existe ningún producto';
         $msgDesc = $hasQuery ? 'Verifica el nombre o SKU e inténtalo nuevamente.' : 'Ajusta los filtros o agrega un nuevo producto.';
+        // Expired context
+        if (strpos($ctxTitle, 'vencid') !== false) {
+          $msgTitle = 'No hay productos vencidos';
+          $msgDesc  = 'Excelente, no tienes productos vencidos en el inventario.';
+        }
+        // Expiring soon context (via title or expiry filter)
+        elseif (strpos($ctxTitle, 'vencer') !== false || $expDays !== null) {
+          $daysTxt = $expDays !== null ? ('en ≤ ' . $expDays . ' días') : 'próximamente';
+          $msgTitle = 'No hay productos por vencer';
+          $msgDesc  = 'No encontramos productos que venzan ' . $daysTxt . '. Continúa monitoreando tu inventario.';
+        }
+        // Low stock context
+        elseif ($stockCtx === 'low') {
+          $msgTitle = 'No hay productos con bajo stock';
+          $msgDesc  = 'Genial, ninguno está por debajo del umbral de stock bajo.';
+        }
     ?>
       <div class="ps-empty-state" role="status" aria-live="polite">
         <div class="box">
@@ -898,7 +947,9 @@
         }
         var item = { product_id: pid, sku: sku, name: name, description: desc, unit_price: price, stock: stock, image: img, status: status, qty: 1 };
         var proceed = function(){
-          try { if (window.loadingBar) window.loadingBar.start('Agregando...'); } catch(_){ }
+          // Show centered blocking overlay for ~3.5s while adding
+          try { window.bannerLoadingMinDuration = 3500; } catch(_){ }
+          try { if (window.bannerLoading) bannerLoading(true, 'Agregando productos...'); } catch(_){ }
           try {
             var KEY = 'pharmasoft_sales_draft';
             var LEGACY = 'pharmasoft_pending_cart';
@@ -924,7 +975,7 @@
           } catch(e) {
             console.error('add to cart failed', e);
           } finally {
-            try { if (window.loadingBar) window.loadingBar.stop(); } catch(_){ }
+            try { if (window.bannerLoading) bannerLoading(false); } catch(_){ }
           }
         };
         // Confirmar costo antes de agregar
@@ -1059,7 +1110,12 @@
         if (fabCount){ fabCount.style.display = cnt>0?'inline-block':'none'; fabCount.textContent = String(cnt); }
         if (mCount){ mCount.textContent = String(cnt); }
         if (!cnt){
-          if (mBody) mBody.innerHTML = '<div class="p-3 text-muted">No hay borrador de carrito.</div>';
+          var emptyHtml = '<div class="p-4 text-center text-muted">'
+            + '<div style="font-size:28px; margin-bottom:8px;"><i class="fas fa-shopping-cart"></i></div>'
+            + '<div style="font-weight:600;">No hay productos agregados al carrito</div>'
+            + '<div class="mt-1">Tu carrito está vacío.</div>'
+            + '</div>';
+          if (mBody) mBody.innerHTML = emptyHtml;
           if (mFooter) mFooter.style.display = 'none';
           if (mTotal) mTotal.textContent = fmt(0);
           return;
@@ -1090,17 +1146,8 @@
         var btns = mBody ? mBody.querySelectorAll('.btnRemoveItem') : [];
         if (btns && btns.forEach){ btns.forEach(function(b){ b.addEventListener('click', function(){ var tr=b.closest('tr'); var idx = tr ? parseInt(tr.getAttribute('data-i')||'-1',10) : -1; var arr = read(); if (idx>=0 && idx < arr.length){ arr.splice(idx,1); write(arr); render(); } }); }); }
       }
-      function open(){ if (!modal) return; try{ if (window.loadingBar) loadingBar.start('Cargando...'); }catch(_){} render(); modal.style.display='block'; document.body.style.overflow='hidden'; setTimeout(function(){ try{ if (window.loadingBar) loadingBar.stop(); }catch(_){ } }, 400); try{ if (window.notify) notify({ icon:'info', title:'Carrito abierto', timer: 3500, position:'top-end', toast:true }); }catch(_){ } }
-      function close(){
-        if (!modal) return;
-        try{ if (window.loadingBar) loadingBar.start('Cerrando...'); }catch(_){ }
-        setTimeout(function(){
-          modal.style.display='none';
-          document.body.style.overflow='';
-          try{ if (window.loadingBar) loadingBar.stop(); }catch(_){ }
-          try{ if (window.notify) notify({ icon:'info', title:'Carrito cerrado', timer: 3500, position:'top-end', toast:true }); }catch(_){ }
-        }, 400);
-      }
+      function open(){ if (!modal) return; render(); modal.style.display='block'; document.body.style.overflow='hidden'; try{ if (window.notify) notify({ icon:'info', title:'Carrito abierto', timer: 2000, position:'top-end', toast:true }); }catch(_){ } }
+      function close(){ if (!modal) return; modal.style.display='none'; document.body.style.overflow=''; try{ if (window.notify) notify({ icon:'info', title:'Carrito cerrado', timer: 2000, position:'top-end', toast:true }); }catch(_){ } }
       if (fab) fab.addEventListener('click', function(e){ e.preventDefault(); open(); });
       if (mClose) mClose.addEventListener('click', function(){ close(); });
       if (mBackdrop) mBackdrop.addEventListener('click', function(e){ if (e.target===mBackdrop) close(); });

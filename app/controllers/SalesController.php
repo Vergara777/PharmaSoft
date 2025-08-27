@@ -31,29 +31,43 @@ class SalesController extends Controller {
         $to = trim((string)($_GET['to'] ?? ''));
         $isYmd = function(string $d){ return (bool)preg_match('/^\d{4}-\d{2}-\d{2}$/', $d); };
         $useDateFilter = $isYmd($from) && $isYmd($to);
+        $explicitDateFilter = (isset($_GET['from']) || isset($_GET['to']));
         if (!$useDateFilter) {
             $from = (new \DateTimeImmutable('today'))->format('Y-m-d');
             $to = $from;
             $useDateFilter = true;
         }
-        $total = $sale->countByDate($from, $to);
-        $pages = max(1, (int)ceil($total / $per));
-        if ($page > $pages) { $page = $pages; }
-        $offset = ($page - 1) * $per;
-        $sales = $sale->byDatePaginated($from, $to, $per, $offset);
-        $this->view('sales/index', [
-            'sales' => $sales,
-            'filterId' => $filterId,
-            'title' => 'Ventas del día',
-            'from' => $from,
-            'to' => $to,
-            'pagination' => [
-                'page' => $page,
-                'per' => $per,
-                'total' => $total,
-                'pages' => $pages,
-            ]
-        ]);
+        if ($explicitDateFilter) {
+            // Show full table for explicit range (no pagination)
+            $sales = $sale->byDatePaginated($from, $to, 1000000, 0);
+            $this->view('sales/index', [
+                'sales' => $sales,
+                'filterId' => $filterId,
+                'title' => 'Ventas del día',
+                'from' => $from,
+                'to' => $to,
+            ]);
+        } else {
+            // Default daily view with pagination
+            $total = $sale->countByDate($from, $to);
+            $pages = max(1, (int)ceil($total / $per));
+            if ($page > $pages) { $page = $pages; }
+            $offset = ($page - 1) * $per;
+            $sales = $sale->byDatePaginated($from, $to, $per, $offset);
+            $this->view('sales/index', [
+                'sales' => $sales,
+                'filterId' => $filterId,
+                'title' => 'Ventas del día',
+                'from' => $from,
+                'to' => $to,
+                'pagination' => [
+                    'page' => $page,
+                    'per' => $per,
+                    'total' => $total,
+                    'pages' => $pages,
+                ]
+            ]);
+        }
     }
 
     public function create(): void {
@@ -177,6 +191,24 @@ class SalesController extends Controller {
         $per = isset($_GET['per']) && ctype_digit((string)$_GET['per']) && (int)$_GET['per'] > 0 ? min((int)$_GET['per'], 100) : 9;
         if ($per < 9) { $per = 9; }
         $sale = new Sale();
+        // Optional date filter for 'todas'
+        $from = trim((string)($_GET['from'] ?? ''));
+        $to = trim((string)($_GET['to'] ?? ''));
+        $isYmd = function(string $d){ return (bool)preg_match('/^\d{4}-\d{2}-\d{2}$/', $d); };
+        $hasRange = $isYmd($from) && $isYmd($to) && (isset($_GET['from']) || isset($_GET['to']));
+        if ($hasRange) {
+            // Full table for the provided range (no pagination footer)
+            $sales = $sale->byDatePaginated($from, $to, 1000000, 0);
+            $this->view('sales/all', [
+                'sales' => $sales,
+                'filterId' => $filterId,
+                'title' => 'Ventas',
+                'from' => $from,
+                'to' => $to,
+            ]);
+            return;
+        }
+        // Default: all with pagination
         $total = $sale->countAll();
         $pages = max(1, (int)ceil($total / $per));
         if ($page > $pages) { $page = $pages; }

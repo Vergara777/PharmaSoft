@@ -75,6 +75,9 @@ $router->post('/products/reactivate/{id}', 'ProductsController@reactivate');
 // Toggle active->retired
 $router->post('/products/retire/{id}', 'ProductsController@retire');
 
+// Notifications
+$router->get('/notifications/alerts', 'NotificationsController@alerts');
+
 // Profile
 $router->get('/profile', 'ProfileController@index');
 $router->post('/profile/avatar', 'ProfileController@uploadAvatar');

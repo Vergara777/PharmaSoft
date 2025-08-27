@@ -46,10 +46,11 @@
       .choices__input { padding-top:.25rem; padding-bottom:.25rem; }
       .choices__item--selectable .choice__inner { display:flex; align-items:center; gap:8px; }
       .choices__item.is-selected .choice__inner { font-weight:600; }
-      /* Status-based colors inside Choices */
+      /* Status-based colors inside Choices (lighter weights for smoother layout) */
       .stock-ok .choice__text, .choice__text.stock-ok { color:#28a745; }
-      .stock-warn .choice__text, .choice__text.stock-warn { color:#d39e00; font-weight:600; }
-      .stock-expired .choice__text, .choice__text.stock-expired { color:#dc3545; font-weight:600; }
+      .stock-warn .choice__text, .choice__text.stock-warn { color:#d39e00; font-weight:500; }
+      .stock-expired .choice__text, .choice__text.stock-expired { color:#dc3545; font-weight:500; }
+      .stock-low .choice__text, .choice__text.stock-low { color:#dc3545; font-weight:500; }
       /* Reduce label spacing to bring inputs up */
       .form-row .form-group > label { margin-bottom:.2rem !important; }
       /* Normalize control heights in the row */
@@ -80,14 +81,32 @@
       .choices[data-type*=select-one] .choices__input { display: block; width: 100%; padding: .375rem .5rem; margin: 0; min-height: auto; }
       .choices__input { font-size: .95rem; }
       /* Make dropdown scroll internally, not the page */
-      .choices__list--dropdown { max-height: 320px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-      .choices.is-open .choices__list--dropdown { max-height: 320px; overflow-y: auto; }
+      .choices__list--dropdown {
+        max-height: 360px;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        /* Performance: isolate and hint GPU for smoother scroll */
+        will-change: transform;
+        transform: translateZ(0);
+        backface-visibility: hidden;
+        contain: content;
+        /* Keep scrollbar space to avoid layout shifts */
+        scrollbar-gutter: stable both-edges;
+      }
+      .choices.is-open .choices__list--dropdown { max-height: 360px; overflow-y: auto; }
+      /* Performance: avoid rendering offscreen items when possible */
+      .choices__list--dropdown .choices__item { content-visibility: auto; contain-intrinsic-size: 44px; }
       /* Only the outer dropdown should scroll to avoid double scrollbars */
       .choices__list--dropdown .choices__list { position: static; max-height: none; overflow: visible; }
       /* Ensure dropdown overlays neighbors and is not hidden */
       .choices { position: relative; }
       .choices.is-open { z-index: 1200; }
       .choices__list--dropdown { z-index: 1210; }
+      /* Zero-stock choice look */
+      .choices__list--dropdown .choices__item.no-stock { opacity: .55; }
+      .choices__list--dropdown .choices__item.no-stock .choice__text { color: #6c757d !important; }
+      .choices__list--dropdown .choices__item.no-stock .choice__img { filter: grayscale(100%); opacity: .8; }
       /* Align labels spacing */
       .form-group > label.mb-1 { margin-bottom: .25rem !important; }
       /* Centered loading overlay */
@@ -95,6 +114,11 @@
       #centerLoading .box { background: #fff; color: #1f2d3d; padding: 14px 18px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25); font-weight: 700; display: inline-flex; align-items: center; gap: .6rem; }
       #centerLoading .box .spinner { width: 1rem; height: 1rem; border: 2px solid #3c8dbc; border-top-color: transparent; border-radius: 50%; animation: sp 1s linear infinite; }
       @keyframes sp { to { transform: rotate(360deg); } }
+      /* Smooth open/close for item detail modal (slower, softer) */
+      #itemDetailModal { opacity: 0; transition: opacity .65s ease; }
+      #itemDetailModal.show { opacity: 1; }
+      #itemDetailModal .modal-card { transform: translateY(10px) scale(.985); transition: transform .65s cubic-bezier(.16,1,.3,1); }
+      #itemDetailModal.show .modal-card { transform: translateY(0) scale(1); }
     </style>
     <!-- Centered full-screen loader -->
     <div id="centerLoading" aria-hidden="true">
@@ -139,6 +163,37 @@
 
     <?php if (!empty($error)): ?>
       <div class="alert alert-danger"><?= View::e($error) ?></div>
+      <script>
+        (function(){
+          var msg = <?= json_encode($error, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+          try {
+            if (window.Swal && Swal.fire) {
+              Swal.fire({
+                icon: 'error',
+                title: 'Error al registrar venta',
+                text: String(msg || ''),
+                position: 'top-end',
+                toast: true,
+                timer: 4000,
+                timerProgressBar: true,
+                showConfirmButton: false
+              });
+            } else if (typeof window.notify === 'function') {
+              // Fallback to notify() API if available
+              try { notify({ icon: 'error', title: 'Error al registrar venta', text: String(msg||''), position: 'top-end', timer: 4000 }); } catch(_){ notify('error', String(msg||'')); }
+            }
+          } catch(_){ /* ignore */ }
+          // Highlight product selector for stock/expiry errors
+          try {
+            var sel = document.querySelector('select[name="product_pick"]');
+            if (!sel) return;
+            if (/vencid/i.test(msg) || /stock insuficiente/i.test(msg)) {
+              sel.classList.add('is-invalid');
+              sel.focus();
+            }
+          } catch(_){ }
+        })();
+      </script>
     <?php endif; ?>
     <form method="post" action="<?= BASE_URL ?>/sales/store" data-loading-text="Guardando venta..." id="cartForm">
       <input type="hidden" name="csrf" value="<?= Security::csrfToken() ?>">
@@ -147,7 +202,7 @@
           <label class="mb-1">Categoría</label>
           <small class="form-text text-muted mb-1">Aquí podrá elegir su categoría</small>
           <select id="catFilter" class="form-control">
-            <option value="">Seleccionar categoría</option>
+            <option value="" disabled hidden data-placeholder="true">Filtrar categoría</option>
             <option value="all">Todas</option>
             <?php if (!empty($categories ?? [])): foreach (($categories ?? []) as $c): ?>
               <option value="<?= (int)($c['id'] ?? 0) ?>"><?= View::e($c['name'] ?? '') ?></option>
@@ -158,7 +213,7 @@
           <label class="mb-1">Producto</label>
           <small class="form-text text-muted mb-1">Busca por nombre o SKU. Escribe aquí el nombre del producto…</small>
           <select name="product_pick" class="form-control">
-            <option value="">-- Selecciona --</option>
+            <option value="">Seleccione un producto</option>
             <?php
               $today = (new DateTimeImmutable('today'))->format('Y-m-d');
               $catMap = [];
@@ -169,15 +224,21 @@
                 $expires = $pr['expires_at'] ?? null;
                 $isExpired = !empty($expires) && $expires < $today;
                 $label = $pr['sku'] . ' - ' . $pr['name'];
+                // Status: expired takes precedence; otherwise by stock thresholds
                 $status = 'ok';
                 if ($isExpired) { $label .= ' (Vencido)'; $status = 'expired'; }
-                elseif (!empty($expires)) { $days = (int) floor((strtotime($expires) - strtotime($today)) / 86400); if ($days <= 30) { $status = 'warn'; $label .= ' (Próx. a vencer)'; } }
+                else {
+                  $stk = (int)($pr['stock'] ?? 0);
+                  if ($stk <= 20) { $status = 'low'; }
+                  elseif ($stk <= 50) { $status = 'warn'; }
+                  else { $status = 'ok'; }
+                }
                 $catId = (int)($pr['category_id'] ?? 0);
                 $supId = (int)($pr['supplier_id'] ?? 0);
                 $catName = isset($catMap[$catId]) && $catMap[$catId] !== '' ? $catMap[$catId] : '';
                 $supName = isset($supMap[$supId]) && $supMap[$supId] !== '' ? $supMap[$supId] : '';
             ?>
-              <option value="<?= View::e($pr['id']) ?>" data-sku="<?= View::e($pr['sku']) ?>" data-name="<?= View::e($pr['name']) ?>" data-description="<?= View::e($pr['description'] ?? '') ?>" data-price="<?= View::e((int)($pr['price'] ?? 0)) ?>" data-image="<?= View::e($pr['image'] ?? '') ?>" data-expired="<?= $isExpired ? '1' : '0' ?>" data-status="<?= View::e($status) ?>" data-stock="<?= View::e($pr['stock'] ?? 0) ?>" data-category-id="<?= $catId ?>" data-category-name="<?= View::e($catName) ?>" data-supplier-id="<?= $supId ?>" data-supplier-name="<?= View::e($supName) ?>" title="<?= $isExpired ? 'Producto vencido' : (!empty($expires) ? ('Vence: ' . View::e($expires)) : '') ?>">
+              <option value="<?= View::e($pr['id']) ?>" data-sku="<?= View::e($pr['sku']) ?>" data-name="<?= View::e($pr['name']) ?>" data-description="<?= View::e($pr['description'] ?? '') ?>" data-price="<?= View::e((int)($pr['price'] ?? 0)) ?>" data-image="<?= View::e($pr['image'] ?? '') ?>" data-expired="<?= $isExpired ? '1' : '0' ?>" data-status="<?= View::e($status) ?>" data-stock="<?= View::e($pr['stock'] ?? 0) ?>" data-category-id="<?= $catId ?>" data-category-name="<?= View::e($catName) ?>" data-supplier-id="<?= $supId ?>" data-supplier-name="<?= View::e($supName) ?>" title="<?= $isExpired ? 'Producto vencido' : ('Stock: ' . (int)($pr['stock'] ?? 0)) ?>">
                 <?= View::e($label) ?>
               </option>
             <?php endforeach; ?>
@@ -279,19 +340,6 @@
     </form>
   </div>
 </div>
-<?php if (!empty($error)): ?>
-<script>
-  try { if (window.notify) notify('error', <?= json_encode($error, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>); } catch(e){}
-  // If error is product expired, highlight product selector
-  (function(){
-    var sel = document.querySelector('select[name="product_pick"]');
-    if (sel && /vencid/i.test(<?= json_encode($error, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>)) {
-      sel.classList.add('is-invalid');
-      sel.focus();
-    }
-  })();
-</script>
-<?php endif; ?>
 
 <script>
   (function(){
@@ -380,16 +428,28 @@
       try {
         if (typeof window.notify === 'function') {
           if (typeof optsOrType === 'string') {
-            return notify({ icon: optsOrType, title: maybeTitle || '', text: maybeText || '', position: 'top-end' });
+            return notify({ icon: optsOrType, title: maybeTitle || '', text: maybeText || '', position: 'top-end', timer: 4000 });
           }
-          var o = optsOrType || {}; o.position = 'top-end';
+          var o = optsOrType || {}; o.position = 'top-end'; if (typeof o.timer === 'undefined') o.timer = 4000;
           return notify(o);
         }
-      } catch(_){}
+      } catch(_){}}
       var o2 = (typeof optsOrType === 'string') ? { icon: optsOrType, title: maybeTitle||'', text: maybeText||'' } : (optsOrType||{});
       if (window.Swal && Swal.fire) {
-        Swal.fire({ icon: o2.icon || 'info', title: o2.title || '', text: o2.text || '', position: 'top-end', toast: true, timer: 2500, timerProgressBar: true, showConfirmButton: false });
+        Swal.fire({ icon: o2.icon || 'info', title: o2.title || '', text: o2.text || '', position: 'top-end', toast: true, timer: (typeof o2.timer==='number'?o2.timer:4000), timerProgressBar: true, showConfirmButton: false, showClass: { popup: 'swal2-show' }, hideClass: { popup: 'swal2-hide' } });
       }
+    }
+
+    // Pretty toast with fixed 4s duration (error/warn/info) for critical messages
+    function centerToast4(type, title, text){
+      try {
+        if (window.Swal && Swal.fire) {
+          return Swal.fire({ icon: type || 'info', title: title || '', text: text || '', position: 'top-end', toast: true, timer: 6000, timerProgressBar: true, showConfirmButton: false, showClass: { popup: 'swal2-show' }, hideClass: { popup: 'swal2-hide' } });
+        }
+        if (typeof window.notify === 'function') {
+          return notify({ icon: type || 'info', title: title || '', text: text || '', position: 'top-end', timer: 6000 });
+        }
+      } catch(_){ }
     }
 
     // Pretty confirm helper (Swal -> psConfirm -> native)
@@ -529,7 +589,7 @@
         price.value = String(v);
       }
       if (pv.name) pv.name.textContent = String(nameTxt).trim();
-      if (pv.badges) pv.badges.innerHTML = badgeFor(status);
+      if (pv.badges) pv.badges.innerHTML = badgeFor(status) + ' ' + stockPreviewBadge(status, ds);
       const imgName = (opt && opt.getAttribute('data-image')) || (cp ? cp.image : '') || '';
       if (pv.img) {
         if (imgName) { pv.img.src = '<?= BASE_URL ?>/uploads/' + imgName; pv.img.style.display = ''; }
@@ -537,7 +597,11 @@
       }
       // Clamp qty to stock immediately
       let q = Math.max(1, parseInt(qty.value || '1', 10));
-      if (ds > 0 && q > ds) { q = ds; qty.value = String(q); centerNotify('warning','Cantidad ajustada','Supera stock disponible ('+ds+').'); }
+      let origQ = q;
+      if (ds > 0 && q > ds) {
+        q = ds; qty.value = String(q);
+        centerToast4('error','Stock insuficiente','Disponible: ' + ds + ', solicitado: ' + origQ + '. Se ajustó a ' + ds + '.');
+      }
       // Prompt on selection (only once per product within a short window)
       try {
         window.__selectPromptGuard = window.__selectPromptGuard || { pid: 0, ts: 0 };
@@ -576,9 +640,20 @@
       } catch(_){ }
     }
     function badgeFor(status){
-      if (status === 'expired') return '<span class="badge badge-danger ml-2">Vencido</span>';
-      if (status === 'warn') return '<span class="badge badge-warning ml-2">Próx. a vencer</span>';
-      return '<span class="badge badge-success ml-2">OK</span>';
+      if (status === 'expired') return '<span class="badge badge-danger ml-2"><i class="fas fa-ban mr-1" aria-hidden="true"></i>Vencido</span>';
+      if (status === 'low') return '<span class="badge badge-danger ml-2"><i class="fas fa-exclamation-circle mr-1" aria-hidden="true"></i>Stock bajo</span>';
+      if (status === 'warn') return '<span class="badge badge-warning ml-2"><i class="fas fa-exclamation-triangle mr-1" aria-hidden="true"></i>Stock medio</span>';
+      return '<span class="badge badge-success ml-2"><i class="fas fa-check mr-1" aria-hidden="true"></i>OK</span>';
+    }
+    // Preview-only: show stock quantity with color-coded label next to the name
+    function stockPreviewBadge(status, qty){
+      var q = (typeof qty === 'number' ? qty : parseInt(qty||'0',10) || 0);
+      var cls = 'badge-success';
+      var txt = 'Stock: ' + q;
+      if (status === 'low') { cls = 'badge-danger'; txt = 'Stock bajo: ' + q; }
+      else if (status === 'warn') { cls = 'badge-warning'; txt = 'Próximo a acabarse: ' + q; }
+      else if (status === 'expired') { cls = 'badge-danger'; txt = 'Vencido'; }
+      return '<span class="badge ml-2 ' + cls + '">' + txt + '</span>';
     }
     // Append item to cart from data (used for localStorage pending cart)
     function addItemFromData(d){
@@ -618,15 +693,23 @@
           </button>
         </td>`;
       body.appendChild(tr);
+      // Expose stock/name/sku for later validations (submit guard)
+      try { tr.setAttribute('data-stock', String(isNaN(stock)?0:stock)); tr.setAttribute('data-sku', sku); tr.setAttribute('data-name', name); } catch(_){ }
       var qtyInput = tr.querySelector('input[name="qty[]"]');
       qtyInput.max = Number.isFinite(stock) && stock > 0 ? String(stock) : '';
-      qtyInput.addEventListener('input', function(){
+      function enforceRowQty(){
         let v = parseInt(qtyInput.value || '1', 10);
-        if (Number.isFinite(stock) && stock > 0 && v > stock) { v = stock; centerNotify('info','Cantidad ajustada','Stock disponible: ' + stock); }
+        let req = v;
+        if (Number.isFinite(stock) && stock > 0 && v > stock) {
+          v = stock;
+          centerToast4('error','Stock insuficiente','Disponible: ' + stock + ', solicitado: ' + req + '. Se ajustó a ' + stock + '.');
+        }
         if (v < 1 || isNaN(v)) { v = 1; }
         qtyInput.value = String(v);
         recalc();
-      });
+      }
+      qtyInput.addEventListener('input', enforceRowQty);
+      qtyInput.addEventListener('change', enforceRowQty);
       tr.querySelector('input[name="unit_price[]"]').addEventListener('input', recalc);
       var btnInfo = tr.querySelector('.btnRowInfo');
       if (btnInfo) {
@@ -666,6 +749,23 @@
           }
         } catch(_){ }
       }
+      // Defensive: block zero-stock selection
+      try {
+        var st0 = 0;
+        if (opt && opt.hasAttribute('data-stock')) st0 = parseInt(opt.getAttribute('data-stock')||'0', 10) || 0;
+        else if (cp && typeof cp.stock !== 'undefined') st0 = parseInt(cp.stock||'0', 10) || 0;
+        if (st0 <= 0) {
+          try { centerLoading.hide(); } catch(_){ }
+          // Clear selection to placeholder
+          if (typeof __choicesInst !== 'undefined' && __choicesInst) {
+            if (typeof __choicesInst.removeActiveItems === 'function') __choicesInst.removeActiveItems();
+            if (typeof __choicesInst.setChoiceByValue === 'function') __choicesInst.setChoiceByValue('');
+          }
+          if (sel) { sel.value = ''; updatePickerFromSelection(); }
+          centerToast4('error','Sin stock','Este producto no tiene stock.');
+          return;
+        }
+      } catch(_){ }
       const pid = parseInt(opt && opt.value ? opt.value : '0', 10);
       if (!pid) { centerNotify('warning','Aviso','Selecciona un producto'); try { centerLoading.hide(); } catch(_){ } return; }
       // Status detection regardless of native <option> or Choices.js
@@ -707,7 +807,8 @@
         const catName = (opt && opt.getAttribute('data-category-name')) || (cp ? (cp.category_name || '') : '') || '';
         const supName = (opt && opt.getAttribute('data-supplier-name')) || (cp ? (cp.supplier_name || '') : '') || '';
         let q = Math.max(1, parseInt(qty.value || '1', 10));
-        if (Number.isFinite(stock) && stock > 0 && q > stock) { centerNotify('warning','Cantidad ajustada','Supera stock disponible (' + stock + '). Se ajustó a ' + stock); q = stock; }
+        let origQ2 = q;
+        if (Number.isFinite(stock) && stock > 0 && q > stock) { centerToast4('error','Stock insuficiente','Disponible: ' + stock + ', solicitado: ' + origQ2 + '. Se ajustó a ' + stock + '.'); q = stock; }
         const p = Math.max(0, Math.round(parseFloat(price.value || '0') || 0));
         const tr = document.createElement('tr');
         const idx = body.querySelectorAll('tr').length + 1;
@@ -731,16 +832,24 @@
             </button>
           </td>`;
         body.appendChild(tr);
+        // Expose stock/name/sku for later validations (submit guard)
+        try { tr.setAttribute('data-stock', String(isNaN(stock)?0:stock)); tr.setAttribute('data-sku', sku); tr.setAttribute('data-name', name); } catch(_){ }
         // Enforce max stock
         var qtyInput = tr.querySelector('input[name="qty[]"]');
         qtyInput.max = Number.isFinite(stock) && stock > 0 ? String(stock) : '';
-        qtyInput.addEventListener('input', function(){
+        function enforceRowQty2(){
           let v = parseInt(qtyInput.value || '1', 10);
-          if (Number.isFinite(stock) && stock > 0 && v > stock) { v = stock; centerNotify('info','Cantidad ajustada','Stock disponible: ' + stock); }
+          let req = v;
+          if (Number.isFinite(stock) && stock > 0 && v > stock) {
+            v = stock;
+            centerToast4('error','Stock insuficiente','Disponible: ' + stock + ', solicitado: ' + req + '. Se ajustó a ' + stock + '.');
+          }
           if (v < 1 || isNaN(v)) { v = 1; }
           qtyInput.value = String(v);
           recalc();
-        });
+        }
+        qtyInput.addEventListener('input', enforceRowQty2);
+        qtyInput.addEventListener('change', enforceRowQty2);
         tr.querySelector('input[name="unit_price[]"]').addEventListener('input', recalc);
         var btnInfo = tr.querySelector('.btnRowInfo');
         if (btnInfo) {
@@ -784,7 +893,7 @@
       wrap.style.justifyContent = 'center';
       wrap.style.zIndex = 1050;
       wrap.innerHTML = '\
-        <div style="background:#fff; max-width:560px; width:92%; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.2); overflow:hidden;">\
+        <div class="modal-card" style="background:#fff; max-width:560px; width:92%; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.2); overflow:hidden;">\
           <div style="padding:14px 18px; border-bottom:1px solid #eee; display:flex; align-items:center;">\
             <h5 style="margin:0; font-weight:600;">Detalle del artículo</h5>\
             <button id="idmClose" type="button" class="btn btn-sm btn-light ml-auto">Cerrar</button>\
@@ -818,7 +927,12 @@
       __idmCat = wrap.querySelector('#idmCat');
       __idmSup = wrap.querySelector('#idmSup');
       var closeBtn = wrap.querySelector('#idmClose');
-      function hide(){ wrap.style.display = 'none'; document.removeEventListener('keydown', escHandler); }
+      function hide(){
+        try { wrap.classList.remove('show'); } catch(_){ }
+        var end = function(){ wrap.removeEventListener('transitionend', end); wrap.style.display = 'none'; };
+        wrap.addEventListener('transitionend', end);
+        document.removeEventListener('keydown', escHandler);
+      }
       var escHandler = function(e){ if (e.key === 'Escape') hide(); };
       closeBtn.addEventListener('click', hide);
       wrap.addEventListener('click', function(e){ if (e.target === wrap) hide(); });
@@ -838,7 +952,8 @@
       if (data.img) { __idmImg.src = data.img; __idmImg.style.display = ''; }
       else { __idmImg.removeAttribute('src'); __idmImg.style.display = 'none'; }
       __idmWrap.style.display = 'flex';
-      setTimeout(function(){ document.addEventListener('keydown', function escHandler(e){ if (e.key === 'Escape') { __idmWrap.style.display = 'none'; document.removeEventListener('keydown', escHandler); } }); }, 0);
+      requestAnimationFrame(function(){ try { __idmWrap.classList.add('show'); } catch(_){ } });
+      setTimeout(function(){ document.addEventListener('keydown', function escHandler(e){ if (e.key === 'Escape') { try { __idmWrap.classList.remove('show'); } catch(_){ } setTimeout(function(){ __idmWrap.style.display = 'none'; }, 650); document.removeEventListener('keydown', escHandler); } }); }, 0);
     }
     // Vaciar carrito con confirmación
     var btnClear = document.getElementById('btnClearCart');
@@ -876,6 +991,8 @@
           if (!o.value) { if (!placeholderOpt) placeholderOpt = o; return; }
           var img = o.getAttribute('data-image') || '';
           // Do NOT skip items without image; include them so category filtering shows all
+          var stRaw = o.getAttribute('data-stock') || '';
+          var stNum = parseInt(stRaw, 10) || 0;
           all.push({
             value: o.value,
             label: o.textContent.trim(),
@@ -887,13 +1004,14 @@
               status: o.getAttribute('data-status') || 'ok',
               sku: o.getAttribute('data-sku') || '',
               price: o.getAttribute('data-price') || '0',
-              stock: o.getAttribute('data-stock') || '',
+              stock: stRaw,
               name: o.getAttribute('data-name') || o.textContent.trim(),
               description: o.getAttribute('data-description') || '',
               category_id: o.getAttribute('data-category-id') || '',
               category_name: o.getAttribute('data-category-name') || '',
               supplier_id: o.getAttribute('data-supplier-id') || '',
-              supplier_name: o.getAttribute('data-supplier-name') || ''
+              supplier_name: o.getAttribute('data-supplier-name') || '',
+              no_stock: (stNum <= 0) ? '1' : '0'
             }
           });
         });
@@ -901,11 +1019,16 @@
         try { sel.innerHTML = ''; if (placeholderOpt) sel.appendChild(placeholderOpt); } catch(_){ }
         __choicesInst = new Choices(sel, {
           searchEnabled: true,
+          placeholder: true,
           searchPlaceholderValue: 'Escribe el nombre del producto…',
-          placeholderValue: '-- Busca por nombre o SKU --',
+          placeholderValue: 'Seleccione un producto',
           noResultsText: 'Sin coincidencias',
           noChoicesText: 'No hay productos',
           shouldSort: false,
+          /* Render fewer DOM nodes at once for smoother scrolling */
+          renderChoiceLimit: 120,
+          searchResultLimit: 120,
+          resetScrollPosition: false,
           itemSelectText: '',
           removeItemButton: false,
           allowHTML: true,
@@ -917,7 +1040,7 @@
                 var status = (d.customProperties && d.customProperties.status) || '';
                 var sku = (d.customProperties && d.customProperties.sku) || '';
                 var imgName = (d.customProperties && d.customProperties.image) || '';
-                if (imgName) img = '<img class="choice__img" src="<?= BASE_URL ?>/uploads/' + imgName + '" alt="">';
+                if (imgName) img = '<img class="choice__img" src="<?= BASE_URL ?>/uploads/' + imgName + '" alt="" width="28" height="28" decoding="async" loading="lazy" fetchpriority="low">';
                 var statusClass = status ? (' stock-' + status) : '';
                 var skuHtml = sku ? ('<span class="choice__sku">' + sku + ' ·</span>') : '';
                 return template('<div class="' + classNames.item + ' ' + (d.highlighted ? classNames.highlightedState : classNames.itemSelectable) + statusClass + '" data-item data-id="' + d.id + '" data-value="' + d.value + '" ' + (d.active ? 'aria-selected="true"' : '') + (d.disabled ? ' aria-disabled="true"' : '') + '><div class="choice__inner">' + img + skuHtml + '<span class="choice__text' + statusClass + '">' + d.label + '</span></div></div>');
@@ -927,10 +1050,13 @@
                 var status = (d.customProperties && d.customProperties.status) || '';
                 var sku = (d.customProperties && d.customProperties.sku) || '';
                 var imgName = (d.customProperties && d.customProperties.image) || '';
-                if (imgName) img = '<img class="choice__img" src="<?= BASE_URL ?>/uploads/' + imgName + '" alt="">';
+                if (imgName) img = '<img class="choice__img" src="<?= BASE_URL ?>/uploads/' + imgName + '" alt="" width="28" height="28" decoding="async" loading="lazy" fetchpriority="low">';
                 var statusClass = status ? (' stock-' + status) : '';
                 var skuHtml = sku ? ('<span class="choice__sku">' + sku + ' ·</span>') : '';
-                return template('<div class="' + classNames.item + ' ' + classNames.itemChoice + ' ' + (d.disabled ? classNames.itemDisabled : classNames.itemSelectable) + '" data-select-text="" data-choice ' + (d.disabled ? 'data-choice-disabled aria-disabled="true"' : 'data-choice-selectable') + ' data-id="' + d.id + '" data-value="' + d.value + '" ' + (d.groupId > 0 ? 'role="treeitem"' : 'role="option"') + '><div class="choice__inner">' + img + skuHtml + '<span class="choice__text' + statusClass + '">' + d.label + '</span></div></div>');
+                var ns = (d.customProperties && String(d.customProperties.no_stock||'0') === '1');
+                var extraCls = ns ? ' no-stock' : '';
+                var extraAttr = ns ? ' data-no-stock="1"' : '';
+                return template('<div class="' + classNames.item + ' ' + classNames.itemChoice + ' ' + (d.disabled ? classNames.itemDisabled : classNames.itemSelectable) + extraCls + '" data-select-text="" data-choice ' + (d.disabled ? 'data-choice-disabled aria-disabled="true"' : 'data-choice-selectable') + ' data-id="' + d.id + '" data-value="' + d.value + '" ' + (d.groupId > 0 ? 'role="treeitem"' : 'role="option"') + extraAttr + '><div class="choice__inner">' + img + skuHtml + '<span class="choice__text' + statusClass + '">' + d.label + '</span></div></div>');
               }
             };
           }
@@ -938,6 +1064,31 @@
         __allChoices = all.slice();
         // Ensure our listener still fires
         sel.addEventListener('change', updatePickerFromSelection);
+        // Intercept click on zero-stock choices to prevent selection and show 4s toast
+        var cont = sel.closest('.choices');
+        if (cont) {
+          cont.addEventListener('mousedown', function(ev){
+            var el = ev.target && ev.target.closest('.choices__item[data-choice][data-no-stock="1"]');
+            if (el) {
+              ev.preventDefault(); ev.stopPropagation();
+              centerToast4('error','Sin stock','Este producto no tiene stock.');
+            }
+          }, true);
+        }
+        // Guard: if a zero-stock item gets selected (keyboard), revert immediately and notify
+        sel.addEventListener('addItem', function(ev){
+          try {
+            var cp = (ev && ev.detail && ev.detail.customProperties) || null;
+            var st = cp ? parseInt(cp.stock || '0', 10) || 0 : 0;
+            if (st <= 0) {
+              if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
+              if (typeof __choicesInst.removeActiveItems === 'function') __choicesInst.removeActiveItems();
+              if (typeof __choicesInst.setChoiceByValue === 'function') __choicesInst.setChoiceByValue('');
+              sel.value = '';
+              centerToast4('error','Sin stock','Este producto no tiene stock.');
+            }
+          } catch(_){ }
+        });
       } catch(_){ /* ignore */ }
     }
     sel && sel.addEventListener('change', updatePickerFromSelection);
@@ -949,12 +1100,14 @@
         __choicesCat = new Choices(catSel, {
           searchEnabled: true,
           searchPlaceholderValue: 'Escriba la categoría…',
-          placeholderValue: 'Seleccionar categoría',
+          placeholder: true,
+          placeholderValue: 'Filtrar categoría',
           itemSelectText: '',
-          shouldSort: true,
+          shouldSort: false,
           removeItemButton: false,
           allowHTML: true
         });
+        // Do not auto-select 'Todas'; keep placeholder visible until user chooses
       } catch(_){ }
     }
     // Category filter -> filter choices
@@ -1012,7 +1165,7 @@
     })();
     // Picker qty immediate cap by stock
     if (qty && sel) {
-      qty.addEventListener('input', function(){
+      function enforcePickerQty(){
         // Resolve current stock from option or Choices customProperties
         let ds = 0;
         let opt = null; let cp = null;
@@ -1029,9 +1182,12 @@
           }
         } catch(_){ }
         let v = Math.max(1, parseInt(qty.value || '1', 10));
-        if (ds > 0 && v > ds) { v = ds; centerNotify('warning','Cantidad ajustada','Supera stock disponible ('+ds+').'); }
+        let req = v;
+        if (ds > 0 && v > ds) { v = ds; centerToast4('error','Stock insuficiente','Disponible: ' + ds + ', solicitado: ' + req + '. Se ajustó a ' + ds + '.'); }
         qty.value = String(v);
-      });
+      }
+      qty.addEventListener('input', enforcePickerQty);
+      qty.addEventListener('change', enforcePickerQty);
     }
     // Si no hay productos activos disponibles, notificar
     if (sel) {
@@ -1040,12 +1196,14 @@
       if (!hasOptions) { centerNotify({icon:'info', title:'Sin inventario', text:'No hay productos activos disponibles para vender.'}); }
     }
     form && form.addEventListener('submit', function(e){
+      // Solo evitar envío si no hay productos
       if (body.querySelectorAll('tr').length === 0) {
         e.preventDefault();
-        try { if (typeof bannerLoading === 'function') bannerLoading(false); } catch(_){}
+        try { if (typeof bannerLoading === 'function') bannerLoading(false); } catch(_){ }
         centerNotify('warning','Aviso','Agrega al menos un producto');
+        return;
       }
-      // On submit, clear draft to avoid stale carts after a successful sale
+      // Dejar que el backend haga la validación de stock
       clearDraft();
     });
 
