@@ -13,6 +13,7 @@
   $isUsersPg = (strpos($reqUri, '/users') !== false);
   $isSuppliersPg = (strpos($reqUri, '/suppliers') !== false);
   $isCategoriesPg = (strpos($reqUri, '/categories') !== false);
+  $isMovementsPg = (strpos($reqUri, '/movements') !== false);
   $isProfilePg = (strpos($reqUri, '/profile') !== false);
   // Current Colombia time from server
   try {
@@ -200,6 +201,18 @@
           6px 0 18px rgba(0, 255, 200, .55);
       }
     }
+    /* Gentle floating for user chip and dropdown panel */
+    @keyframes ps-chip-float { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2px) scale(1.035); } }
+    @keyframes ps-dd-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+    /* RGB border animation for dropdown */
+    @keyframes ps-dd-rgb { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+    /* Subtle RGB halo for user chip */
+    @keyframes ps-chip-rgb {
+      0% { box-shadow: 0 2px 10px rgba(239,68,68,.16), 0 0 6px rgba(255, 59, 48, .28), 0 0 0px rgba(52, 199, 89, 0); }
+      33% { box-shadow: 0 2px 10px rgba(239,68,68,.16), 0 0 10px rgba(52, 199, 89, .32), 0 0 16px rgba(88, 86, 214, .22); }
+      66% { box-shadow: 0 2px 10px rgba(239,68,68,.16), 0 0 12px rgba(10, 132, 255, .34), 0 0 18px rgba(255, 149, 0, .24); }
+      100% { box-shadow: 0 2px 10px rgba(239,68,68,.16), 0 0 10px rgba(255, 59, 48, .30), 0 0 14px rgba(0, 255, 200, .22); }
+    }
     .chip-muted { background:#f3f4f6; color:#374151; border-color:#e5e7eb; }
     /* Lightweight modal (global) */
     .ps-modal { position: fixed; inset: 0; z-index: 3050; display: none; opacity: 0; transition: opacity .65s ease; }
@@ -258,21 +271,32 @@
     .ps-navbar .nav-link:hover { color: #111827; background: rgba(59,130,246,.10); }
     .ps-navbar .nav-link.active { color: #0f172a; background: rgba(59,130,246,.18); box-shadow: inset 0 0 0 1px rgba(59,130,246,.35); }
     /* Profile chip (pastel red) */
-    .user-menu > .nav-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 10px; border-radius: 999px; background: linear-gradient(135deg, #ffe4e6, #fecaca); border: 1px solid #fecaca; box-shadow: 0 2px 10px rgba(239,68,68,.14); transition: background .2s ease, box-shadow .2s ease, transform .05s ease; }
-    .user-menu > .nav-link:hover { background: linear-gradient(135deg, #fecaca, #fbcfe8); box-shadow: 0 4px 14px rgba(244,63,94,.22); }
-    .user-menu > .nav-link:active { transform: translateY(1px); }
-    .user-menu > .nav-link .user-image { width: 28px; height: 28px; border: 2px solid #fecaca; box-shadow: 0 2px 6px rgba(239,68,68,.18); }
+    .user-menu > .nav-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 5px 9px; border-radius: 999px; background: linear-gradient(135deg, #ffe4e6, #fecaca); border: 1px solid #fecaca; box-shadow: 0 2px 10px rgba(239,68,68,.14); transition: background .2s ease, box-shadow .2s ease, transform .1s ease; animation: ps-chip-float 5.5s ease-in-out infinite, ps-chip-rgb 4.5s ease-in-out infinite; }
+    .user-menu > .nav-link:hover { background: linear-gradient(135deg, #fecaca, #fbcfe8); box-shadow: 0 6px 16px rgba(244,63,94,.25), 0 0 0 2px rgba(255,255,255,.35) inset; }
+    .user-menu > .nav-link:active { transform: translateY(1px) scale(.995); }
+    .user-menu > .nav-link .user-image { width: 28px; height: 28px; border: 2px solid #fecaca; box-shadow: 0 2px 6px rgba(239,68,68,.18); transform: translateY(2px); }
     .user-menu > .nav-link span { font-weight: 700; color: #0f172a; }
     /* Dropdown redesign */
-    .ps-user-dd { width: 320px; overflow: hidden; border-radius: 12px; box-shadow: 0 18px 50px rgba(0,0,0,.18); }
-    .ps-user-dd-header { background: linear-gradient(135deg,#1d4ed8,#3b82f6); text-align:center; padding: 18px 16px; }
+    .ps-user-dd { width: 340px; overflow: hidden; border-radius: 14px; box-shadow: 0 22px 60px rgba(0,0,0,.18); position: relative; }
+    .ps-user-dd::before { content: ""; position: absolute; inset: -2px; border-radius: 16px; padding: 2px; background: linear-gradient(90deg,#38bdf8,#a78bfa,#fb7185,#34d399,#38bdf8); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: ps-dd-rgb 8s linear infinite; pointer-events: none; }
+    .ps-user-dd-header { background: radial-gradient(120% 120% at 0% 0%, #1d4ed8, #3b82f6); text-align:center; padding: 18px 16px 14px; position: relative; }
+    .ps-user-dd-header::after { content: ""; position: absolute; inset: auto 0 0 0; height: 5px; background: linear-gradient(90deg,#38bdf8,#a78bfa,#fb7185,#34d399); filter: saturate(1.1); opacity: .9; }
     .ps-user-dd-header .avatar { width: 84px; height: 84px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 6px 18px rgba(0,0,0,.25); object-fit: cover; }
     .ps-user-dd-header .name { color:#fff; font-weight: 900; font-size: 17px; margin-top: 10px; }
-    .ps-user-dd-header .email { color: rgba(255,255,255,.95); font-weight: 600; font-size: 13px; }
+    .ps-user-dd-header .email { color: rgba(255,255,255,.95); font-weight: 700; font-size: 13px; }
+    .ps-user-dd-header .role { display:inline-flex; align-items:center; gap:6px; margin-top: 6px; font-weight:900; font-size: 12px; padding:6px 10px; border-radius:999px; border:1px solid transparent; }
+    .ps-role-admin  { background: rgba(239,68,68,.14); color: #fee2e2; border-color: rgba(239,68,68,.45); }
+    .ps-role-tech   { background: rgba(59,130,246,.14); color: #dbeafe; border-color: rgba(59,130,246,.45); }
+    .ps-role-worker { background: rgba(245,158,11,.14); color: #fef08a; border-color: rgba(245,158,11,.45); }
+    .ps-role-default{ background: rgba(148,163,184,.16); color: #f3f4f6; border-color: rgba(148,163,184,.35); }
     .ps-user-dd .dd-actions { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; background:#fff; }
-    .ps-user-dd .btn { font-weight: 700; font-size: 13px; padding: 6px 10px; border-radius: 8px; }
-    .ps-user-dd .btn-profile { }
-    .ps-user-dd .btn-logout { }
+    .ps-user-dd .btn { font-weight: 900; font-size: 12.5px; padding: 7px 10px; border-radius: 9px; transition: transform .12s ease, box-shadow .2s ease, background .2s ease; pointer-events: auto; }
+    .ps-user-dd .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,0,0,.12); }
+    .ps-user-dd .btn:active { transform: translateY(0); }
+    .ps-user-dd .btn-profile { background: linear-gradient(135deg,#e0e7ff,#bfdbfe); color:#1e40af; border:1px solid #bfdbfe; }
+    .ps-user-dd .btn-profile:hover { background: linear-gradient(135deg,#dbeafe,#a5b4fc); color:#1e3a8a; }
+    .ps-user-dd .btn-logout { background: linear-gradient(135deg,#fee2e2,#fecaca); color:#7f1d1d; border:1px solid #fecaca; }
+    .ps-user-dd .btn-logout:hover { background: linear-gradient(135deg,#fecaca,#fbcfe8); color:#7f1d1d; }
     /* Sidebar hide/show behavior */
     body.sidebar-hidden .main-sidebar { display: none !important; }
     .sidebar-hidden .content-wrapper { margin-left: 0 !important; }
@@ -308,7 +332,12 @@
     body.dark-mode .ps-navbar .nav-link.active { color: #fff; background: rgba(59,130,246,.28); box-shadow: inset 0 0 0 1px rgba(59,130,246,.45); }
     body.dark-mode .ps-user-dd { background: #0f172a; color: #e5e7eb; }
     body.dark-mode .ps-user-dd .dd-actions { background: #0f172a; }
-    body.dark-mode .ps-user-dd-header { background: linear-gradient(135deg,#7f1d1d,#b91c1c); }
+    body.dark-mode .ps-user-dd-header { background: radial-gradient(120% 120% at 0% 0%, #7f1d1d, #b91c1c); }
+    body.dark-mode .ps-user-dd-header::after { opacity: .75; }
+    body.dark-mode .ps-user-dd .btn-profile { background: linear-gradient(135deg,#1f2937,#111827); color:#bfdbfe; border-color: rgba(59,130,246,.35); }
+    body.dark-mode .ps-user-dd .btn-profile:hover { background: linear-gradient(135deg,#0b1220,#111827); }
+    body.dark-mode .ps-user-dd .btn-logout { background: linear-gradient(135deg,#111827,#0b1220); color:#fecaca; border-color: rgba(239,68,68,.35); }
+    body.dark-mode .ps-user-dd .btn-logout:hover { background: linear-gradient(135deg,#111827,#111827); }
     body.dark-mode .dropdown-menu { background: #0f172a; color: #e5e7eb; border-color: rgba(255,255,255,.08); }
     body.dark-mode .dropdown-item { color: #e5e7eb; }
     body.dark-mode .dropdown-item:hover { background: rgba(59,130,246,.20); color: #fff; }
@@ -344,6 +373,13 @@
         if (strpos($avatar, 'http://') !== 0 && strpos($avatar, 'https://') !== 0) { $avatar = BASE_URL . '/' . ltrim($avatar, '/'); }
         $avver = isset($_SESSION['user']['avatar_ver']) ? (int)$_SESSION['user']['avatar_ver'] : 0;
         $avatar_q = $avatar . ($avver ? (strpos($avatar, '?') === false ? ('?v=' . $avver) : ('&v=' . $avver)) : '');
+        // Role mapping for pretty badge
+        $roleRaw = strtolower((string)($_SESSION['user']['role'] ?? ''));
+        $roleName = $roleRaw ?: 'Usuario';
+        $roleClass = 'ps-role-default';
+        if (in_array($roleRaw, ['admin','administrator'], true)) { $roleName = 'Administrador'; $roleClass = 'ps-role-admin'; }
+        elseif (in_array($roleRaw, ['technician','tecnico','técnico'], true)) { $roleName = 'Técnico'; $roleClass = 'ps-role-tech'; }
+        elseif (in_array($roleRaw, ['worker','trabajador'], true)) { $roleName = 'Trabajador'; $roleClass = 'ps-role-worker'; }
       ?>
       <li class="nav-item dropdown user-menu">
         <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">
@@ -355,11 +391,12 @@
             <img src="<?= View::e($avatar_q) ?>" class="avatar" alt="Avatar">
             <div class="name"><?= View::e($name) ?></div>
             <div class="email"><?= View::e($_SESSION['user']['email'] ?? '') ?></div>
+            <div class="role <?= View::e($roleClass) ?>" title="Rol del usuario"><i class="fas fa-user-shield mr-1" aria-hidden="true"></i> <?= View::e($roleName) ?></div>
           </li>
           <li class="p-2">
             <div class="dd-actions">
-              <a href="<?= BASE_URL ?>/profile" class="btn btn-outline-secondary btn-profile"><i class="fas fa-user mr-1"></i> Gestionar perfil</a>
-              <a href="<?= BASE_URL ?>/auth/logout" class="btn btn-outline-danger btn-logout js-confirmable" data-confirm-title="Cerrar sesión" data-confirm-text="¿Seguro que deseas cerrar sesión?" data-confirm-ok="Cerrar" data-confirm-cancel="Cancelar"><i class="fas fa-sign-out-alt mr-1"></i> Cerrar sesión</a>
+              <a href="<?= BASE_URL ?>/profile" class="btn btn-profile"><i class="fas fa-user mr-1"></i> Ir al perfil</a>
+              <a href="<?= BASE_URL ?>/auth/logout" class="btn btn-logout js-confirmable" data-confirm-title="Cerrar sesión" data-confirm-text="¿Seguro que deseas cerrar sesión?" data-confirm-ok="Cerrar" data-confirm-cancel="Cancelar"><i class="fas fa-sign-out-alt mr-1"></i> Cerrar sesión</a>
             </div>
           </li>
         </ul>
@@ -389,6 +426,7 @@
             <li class="nav-item"><a href="<?= BASE_URL ?>/users" class="nav-link"><i class="nav-icon fas fa-users"></i><p>Usuarios</p></a></li>
             <li class="nav-item"><a href="<?= BASE_URL ?>/suppliers" class="nav-link"><i class="nav-icon fas fa-truck"></i><p>Proveedores</p></a></li>
             <li class="nav-item"><a href="<?= BASE_URL ?>/categories" class="nav-link"><i class="nav-icon fas fa-tags"></i><p>Categorías</p></a></li>
+            <li class="nav-item"><a href="<?= BASE_URL ?>/movements" class="nav-link"><i class="nav-icon fas fa-history"></i><p>Movimientos</p></a></li>
           <?php endif; ?>
           <li class="nav-item"><a href="<?= BASE_URL ?>/profile" class="nav-link"><i class="nav-icon fas fa-user"></i><p>Perfil</p></a></li>
         </ul>
@@ -511,9 +549,9 @@
         body.classList.remove('sidebar-open');
         if (sidebar) sidebar.style.display = 'none';
       } else {
-        // Show sidebar fully expanded initially
+        // Sidebar visible: default to collapsed (mini) unless user preference overrides later
         body.classList.remove('sidebar-hidden');
-        body.classList.remove('sidebar-collapse');
+        body.classList.add('sidebar-collapse');
         body.classList.remove('sidebar-open');
         if (sidebar) sidebar.style.display = '';
       }
@@ -532,6 +570,13 @@
       const saved = (c !== null) ? c : localStorage.getItem(key);
       if (saved === '1') apply(true); else if (saved === '0') apply(false);
     } catch (e) {}
+    // If no explicit hidden state saved, and sidebar is visible, ensure it starts collapsed by default
+    try {
+      const hasHidden = (function(){ const c = readCookie('psSidebarHidden'); const s = localStorage.getItem(key); return (c!==null) || (s!==null); })();
+      if (!hasHidden && !body.classList.contains('sidebar-hidden')) {
+        body.classList.add('sidebar-collapse');
+      }
+    } catch(_){}
     const onToggle = function(ev){
       if (ev) ev.preventDefault();
       const hidden = !body.classList.contains('sidebar-hidden');
@@ -550,6 +595,8 @@
     });
     // Expand on hover (remove collapse) and collapse when leaving the sidebar subtree
     (function(){
+      // Use server date as authoritative "today" to avoid client timezone/clock drift
+      var SERVER_TODAY = '<?= date('Y-m-d') ?>';
       const sb = document.querySelector('.main-sidebar');
       if (!sb) return;
       function isVisible(){ return !body.classList.contains('sidebar-hidden'); }
@@ -784,10 +831,17 @@
       if (href.startsWith('#') || href.startsWith('javascript:')) return;
       if (this.target && this.target === '_blank') return;
       if (!sameOrigin(href)) return;
+      // Skip for explicit no-loader links (e.g., file exports/downloads)
+      try { if (this.hasAttribute('data-no-loader')) return; } catch(_){ }
       try { if (window.loadingBar) window.loadingBar.start('Cargando...'); } catch(_){ }
       // allow navigation to proceed normally
     });
-    window.addEventListener('beforeunload', function(){ try { if (window.loadingBar) window.loadingBar.start('Cargando...'); } catch(_){ } });
+    window.addEventListener('beforeunload', function(){
+      try {
+        if (window.__psSkipNextBeforeUnload) { window.__psSkipNextBeforeUnload = false; return; }
+        if (window.loadingBar) window.loadingBar.start('Cargando...');
+      } catch(_){ }
+    });
   })();
 
   // Global Cart (floating) only when authenticated and not on login page
@@ -1302,22 +1356,44 @@
         if (m) { return new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10)); }
         return null;
       }
-      function daysFromToday(date){
+      // Ensure server date is available globally for date-only comparisons
+      try { if (typeof window !== 'undefined' && !window.SERVER_TODAY) { window.SERVER_TODAY = '<?= date('Y-m-d') ?>'; } } catch(_){}
+      function getTodayStr(){
+        try { return (typeof window !== 'undefined' && window.SERVER_TODAY) ? String(window.SERVER_TODAY) : '<?= date('Y-m-d') ?>'; } catch(_){ return '<?= date('Y-m-d') ?>'; }
+      }
+      function daysFromToday(dateStr){
         try {
-          var d = (date instanceof Date) ? date : parseYMD(date);
-          if (!d) return null;
-          var today = new Date();
-          // normalize to local date at midnight
-          d.setHours(0,0,0,0);
-          today.setHours(0,0,0,0);
-          var diff = Math.round((d.getTime() - today.getTime()) / 86400000);
-          return diff; // negative means overdue by |diff|
+          var d;
+          if (dateStr instanceof Date) {
+            d = new Date(dateStr.getTime());
+          } else if (typeof dateStr === 'string') {
+            // Parse YYYY-MM-DD as local date
+            var m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(dateStr.trim());
+            if (m) {
+              d = new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10));
+            } else {
+              d = new Date(dateStr);
+            }
+          } else {
+            d = new Date(dateStr);
+          }
+          if (!d || isNaN(d.getTime())) return null;
+          // Today based on server local date; read from window.SERVER_TODAY with fallback
+          var todayStr = (typeof window !== 'undefined' && window.SERVER_TODAY) ? String(window.SERVER_TODAY) : '<?= date('Y-m-d') ?>';
+          var tm = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(todayStr);
+          var ty = parseInt(tm[1],10), tmo = parseInt(tm[2],10)-1, td = parseInt(tm[3],10);
+          // Compute using UTC-normalized midnight to avoid DST/timezone drift
+          var targetUTC = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+          var todayUTC  = Date.UTC(ty, tmo, td);
+          var diff = Math.round((targetUTC - todayUTC) / 86400000);
+          return diff;
         } catch(_){ return null; }
       }
       async function fetchAlerts(){
         try {
           setRefreshLoading(true);
-          const res = await fetch('<?= BASE_URL ?>/notifications/alerts', { headers: { 'Accept': 'application/json', 'X-No-Loader': '1' } });
+          const url = '<?= BASE_URL ?>/notifications/alerts' + '?_=' + Date.now();
+          const res = await fetch(url, { headers: { 'Accept': 'application/json', 'X-No-Loader': '1' } });
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
           renderAlerts(data && data.ok ? data : { ok:false, low_stock:[], expired:[], expiring:[], threshold: 0 });
@@ -1325,8 +1401,17 @@
         finally { setRefreshLoading(false); }
       }
       function chip(cls, text){ return '<span class="chip ' + cls + '">' + text + '</span>'; }
-      function rowItem(id, name, sku, chips){
-        var left = '<div class="left"><span class="name">' + name + '</span>' + (sku ? '<span class="sku">['+ sku +']</span>' : '') + '</div>';
+      function resolveImg(src){
+        if (!src) return '';
+        try {
+          if (/^https?:\/\//i.test(src)) return src;
+          if (src[0] === '/') return src;
+          return '<?= BASE_URL ?>/uploads/' + src;
+        } catch(_) { return src; }
+      }
+      function rowItem(id, name, sku, chips, img){
+        var imgHtml = img ? ('<img src="' + resolveImg(img) + '" alt="" style="width:32px;height:32px;object-fit:cover;border-radius:4px;border:1px solid #eee;margin-right:8px;vertical-align:middle;">') : '';
+        var left = '<div class="left">' + imgHtml + '<span class="name">' + name + '</span>' + (sku ? '<span class="sku">['+ sku +']</span>' : '') + '</div>';
         var right = '<div class="right">' + chips.join('') + '</div>';
         // If we have a valid id, render as an accessible anchor to product edit; otherwise a non-clickable div
         var inner = left + right;
@@ -1349,8 +1434,26 @@
       function renderAlerts(data){
         try {
           var low = data.low_stock || [];
-          var exp = data.expired || [];
-          var soon = data.expiring || [];
+          // Trust backend classification; only compute dd to show friendly chips
+          var exp = (data.expired || []).slice();
+          var soon = (data.expiring || []).slice();
+          // One-time banner: if there are expired items, notify immediately
+          try {
+            var hasExpiredNow = false;
+            for (var j = 0; j < exp.length; j++) {
+              var dxx = daysFromToday(exp[j] && exp[j].expires_at);
+              if (dxx != null && dxx <= 0) { hasExpiredNow = true; break; }
+            }
+            if (hasExpiredNow) {
+              var key = 'ps_expired_notified';
+              var todayStr = (new Date()).toDateString();
+              var last = null; try { last = sessionStorage.getItem(key); } catch(_e){}
+              if (last !== todayStr) {
+                try { sessionStorage.setItem(key, todayStr); } catch(_e){}
+                notify({ icon:'error', title:'Producto vencido', text:'Hay productos vencidos en el inventario.' });
+              }
+            }
+          } catch(_e){}
           // UI policy: rojo < 20, amarillo 20..60, >60 no mostrar
           var lowFiltered = low.filter(function(p){
             var st = (p && p.stock != null) ? parseInt(p.stock,10) : null;
@@ -1367,21 +1470,49 @@
               }
               chips.push(chip((st < 20 ? 'chip-danger' : 'chip-warn') + ' chip-emph','Quedan ' + st + ' unidades'));
             }
-            return rowItem(p && p.id, (p.name||''), (p.sku||''), chips);
+            return rowItem(p && p.id, (p.name||''), (p.sku||''), chips, p && p.image);
           }).join('');
           var expHtml = exp.map(function(p){
-            var chips = [ chip('chip-danger','Peligro'), chip('chip-danger','Vencido') ];
+            var chips = [ chip('chip-danger','Vencido') ];
             var dd = daysFromToday(p.expires_at);
-            if (dd != null && dd < 0) chips.push(chip('chip-danger', 'Hace ' + (Math.abs(dd)) + ' días'));
+            var todayStr = getTodayStr();
+            var isToday = (p && p.expires_at && String(p.expires_at).slice(0,10) === todayStr);
+            if (dd != null) {
+              if (dd === 0) {
+                chips.push(chip('chip-danger', 'Venció hoy'));
+              } else if (dd < 0) {
+                var absd = Math.abs(dd);
+                var dl = (absd === 1 ? 'día' : 'días');
+                chips.push(chip('chip-danger', 'Venció hace ' + absd + ' ' + dl));
+              }
+            }
+            if (dd == null && isToday) { chips.push(chip('chip-danger', 'Venció hoy')); }
             if (p.expires_at) chips.push(chip('chip-muted', p.expires_at));
-            return rowItem(p && p.id, (p.name||''), (p.sku||''), chips);
+            return rowItem(p && p.id, (p.name||''), (p.sku||''), chips, p && p.image);
           }).join('');
           var soonHtml = soon.map(function(p){
             var dd = daysFromToday(p.expires_at);
-            var chips = [ chip('chip-warn','Próximo a vencer') ];
-            if (dd != null && dd >= 0) chips.push(chip('chip-warn','Faltan ' + dd + ' días'));
+            var chips = [ chip('chip-warn','Por vencer') ];
+            if (dd != null && dd > 0) {
+              var dl2 = (dd === 1 ? 'día' : 'días');
+              chips.push(chip('chip-warn','Faltan ' + dd + ' ' + dl2));
+            }
+            // Defensive: if dd is null but date is within 1..31 days by string compare vs today, try to compute quickly
+            if (dd == null && p && p.expires_at) {
+              try {
+                var todayParts = getTodayStr().split('-');
+                var exParts = String(p.expires_at).slice(0,10).split('-');
+                var tD = Date.UTC(parseInt(todayParts[0],10), parseInt(todayParts[1],10)-1, parseInt(todayParts[2],10));
+                var eD = Date.UTC(parseInt(exParts[0],10), parseInt(exParts[1],10)-1, parseInt(exParts[2],10));
+                var rough = Math.round((eD - tD)/86400000);
+                if (rough > 0 && rough <= 31) {
+                  var dl3 = (rough === 1 ? 'día' : 'días');
+                  chips.push(chip('chip-warn','Faltan ' + rough + ' ' + dl3));
+                }
+              } catch(_){ }
+            }
             if (p.expires_at) chips.push(chip('chip-muted', p.expires_at));
-            return rowItem(p && p.id, (p.name||''), (p.sku||''), chips);
+            return rowItem(p && p.id, (p.name||''), (p.sku||''), chips, p && p.image);
           }).join('');
           var total = lowFiltered.length + exp.length + soon.length;
           setBadge(total);

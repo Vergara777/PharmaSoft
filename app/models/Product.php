@@ -61,7 +61,7 @@ class Product extends Model {
         }
         if ($stockFilter === 'low') {
             $thr = ($lowStockThreshold !== null && $lowStockThreshold > 0) ? $lowStockThreshold : 5;
-            $where[] = 'stock > 0 AND stock <= :thr';
+            $where[] = 'stock <= :thr';
             $bind[':thr'] = [$thr, PDO::PARAM_INT];
         }
 
@@ -111,7 +111,7 @@ class Product extends Model {
         }
         if ($stockFilter === 'low') {
             $thr = ($lowStockThreshold !== null && $lowStockThreshold > 0) ? $lowStockThreshold : 5;
-            $where[] = 'stock > 0 AND stock <= :thr';
+            $where[] = 'stock <= :thr';
             $bind[':thr'] = [$thr, PDO::PARAM_INT];
         }
         $whereSql = implode(' AND ', $where);

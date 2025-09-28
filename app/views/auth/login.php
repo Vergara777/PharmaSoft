@@ -133,7 +133,7 @@
       </div>
     <?php endif; ?>
     <div class="login-body">
-      <form method="post" action="<?= BASE_URL ?>/auth/login" data-loading-text="Validando...">
+      <form method="post" action="<?= BASE_URL ?>/auth/login" data-loading-text="Iniciando sesión...">
         <input type="hidden" name="csrf" value="<?= Security::csrfToken() ?>">
         <div class="form-group">
           <label for="loginEmail">Email</label>

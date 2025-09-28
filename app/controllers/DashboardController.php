@@ -14,9 +14,12 @@ class DashboardController extends Controller {
         $stmtLow = $db->prepare("SELECT COUNT(*) c FROM products WHERE status='active' AND stock <= ?");
         $stmtLow->execute([defined('LOW_STOCK_THRESHOLD') ? LOW_STOCK_THRESHOLD : 5]);
         $lowStock = (int)$stmtLow->fetchColumn();
-        $expiring = (int)$db->query("SELECT COUNT(*) c FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)")->fetchColumn();
-        $expired = (int)$db->query("SELECT COUNT(*) c FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at < CURDATE()")->fetchColumn();
-        $expiringSoon = (int)$db->query("SELECT COUNT(*) c FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at >= CURDATE() AND expires_at <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)")->fetchColumn();
+        $expiring = (int)$db->query("SELECT COUNT(*) c FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at > CURDATE() AND expires_at <= DATE_ADD(CURDATE(), INTERVAL 31 DAY)")
+                                  ->fetchColumn();
+        $expired = (int)$db->query("SELECT COUNT(*) c FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at <= CURDATE()")
+                                   ->fetchColumn();
+        $expiringSoon = (int)$db->query("SELECT COUNT(*) c FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at > CURDATE() AND expires_at <= DATE_ADD(CURDATE(), INTERVAL 31 DAY)")
+                                  ->fetchColumn();
         $todaySalesCount = (int)$db->query("SELECT COUNT(*) c FROM sales WHERE DATE(created_at) = CURDATE()")
                                    ->fetchColumn();
         $todaySalesTotal = (float)$db->query("SELECT COALESCE(SUM(total),0) s FROM sales WHERE DATE(created_at) = CURDATE()")
@@ -136,12 +139,12 @@ class DashboardController extends Controller {
             Flash::info('Debug: vencidos='.$expired.' | por vencer='.$expiringSoon, 'Debug Expiración', 6000, 'top-end');
         }
         // Detailed lists for welcome modal (expired and expiring soon)
-        $expiredDetails = $db->query("SELECT name, sku, stock, DATEDIFF(CURDATE(), expires_at) AS days_over, DATE_FORMAT(expires_at,'%d/%m/%Y') d FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at < CURDATE() ORDER BY expires_at ASC, name ASC LIMIT 10")->fetchAll();
-        $expiringDetails = $db->query("SELECT name, sku, stock, DATEDIFF(expires_at, CURDATE()) AS days_left, DATE_FORMAT(expires_at,'%d/%m/%Y') d FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at >= CURDATE() AND expires_at <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) ORDER BY expires_at ASC, name ASC LIMIT 10")->fetchAll();
+        $expiredDetails = $db->query("SELECT name, sku, stock, DATEDIFF(CURDATE(), expires_at) AS days_over, DATE_FORMAT(expires_at,'%d/%m/%Y') d FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at <= CURDATE() ORDER BY expires_at ASC, name ASC LIMIT 10")->fetchAll();
+        $expiringDetails = $db->query("SELECT name, sku, stock, DATEDIFF(expires_at, CURDATE()) AS days_left, DATE_FORMAT(expires_at,'%d/%m/%Y') d FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at > CURDATE() AND expires_at <= DATE_ADD(CURDATE(), INTERVAL 31 DAY) ORDER BY expires_at ASC, name ASC LIMIT 10")->fetchAll();
 
         // Notify expired products
         if ($expired > 0) {
-            $expiredList = $db->query("SELECT name, sku, DATE_FORMAT(expires_at,'%d/%m/%Y') d FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at < CURDATE() ORDER BY expires_at ASC, name ASC LIMIT 5")->fetchAll();
+            $expiredList = $db->query("SELECT name, sku, DATE_FORMAT(expires_at,'%d/%m/%Y') d FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at <= CURDATE() ORDER BY expires_at ASC, name ASC LIMIT 5")->fetchAll();
             $items = array_map(function($r){
                 $n = isset($r['name']) ? $r['name'] : '';
                 $s = isset($r['sku']) ? $r['sku'] : '';
@@ -154,7 +157,7 @@ class DashboardController extends Controller {
         }
         // Notify expiring soon products
         if ($expiringSoon > 0) {
-            $soonList = $db->query("SELECT name, sku, DATE_FORMAT(expires_at,'%d/%m/%Y') d FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at >= CURDATE() AND expires_at <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) ORDER BY expires_at ASC, name ASC LIMIT 5")->fetchAll();
+            $soonList = $db->query("SELECT name, sku, DATE_FORMAT(expires_at,'%d/%m/%Y') d FROM products WHERE status='active' AND expires_at IS NOT NULL AND expires_at > CURDATE() AND expires_at <= DATE_ADD(CURDATE(), INTERVAL 31 DAY) ORDER BY expires_at ASC, name ASC LIMIT 5")->fetchAll();
             $items2 = array_map(function($r){
                 $n = isset($r['name']) ? $r['name'] : '';
                 $s = isset($r['sku']) ? $r['sku'] : '';
@@ -162,7 +165,7 @@ class DashboardController extends Controller {
                 return trim(($s ? ("[$s] ") : '') . $n . ($d ? (" (".$d.")") : ''));
             }, $soonList ?: []);
             $extra2 = $expiringSoon > count($items2) ? (' y +' . ($expiringSoon - count($items2)) . ' más') : '';
-            $msg2 = 'Tienes ' . $expiringSoon . ' producto(s) por vencer (≤ 30 días).' . (empty($items2) ? '' : (' Ej: ' . implode(', ', $items2))) . $extra2;
+            $msg2 = 'Tienes ' . $expiringSoon . ' producto(s) por vencer (≤ 31 días).' . (empty($items2) ? '' : (' Ej: ' . implode(', ', $items2))) . $extra2;
             Flash::info($msg2, 'Por vencer', 4000, 'top-end');
         }
         // Notify out-of-stock (sin stock)
@@ -197,6 +200,9 @@ class DashboardController extends Controller {
         }
         if ($welcome && !isset($_GET['welcome'])) { unset($_SESSION['welcome']); }
         $user = Auth::user();
-        $this->view('dashboard/index', compact('totalProducts','lowStock','expiring','expired','expiringSoon','todaySalesCount','todaySalesTotal','monthSalesTotal','yearSalesTotal','monthProfit','yearProfit','todaySales','lowStockList','topProducts','heatmap','zeroStock','zeroStockList','welcome','user','expiredDetails','expiringDetails') + ['title' => 'Dashboard']);
+        $this->view('dashboard/index', array_merge(
+            compact('totalProducts','lowStock','expiring','expired','expiringSoon','todaySalesCount','todaySalesTotal','monthSalesTotal','yearSalesTotal','monthProfit','yearProfit','todaySales','lowStockList','topProducts','heatmap','zeroStock','zeroStockList','welcome','user','expiredDetails','expiringDetails'),
+            ['title' => 'Dashboard']
+        ));
     }
 }

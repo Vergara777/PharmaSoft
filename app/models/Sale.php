@@ -2,6 +2,7 @@
 namespace App\Models;
 
 use App\Core\Model;
+use App\Helpers\Audit;
 use App\Helpers\Auth;
 use PDO;
 
@@ -312,6 +313,19 @@ class Sale extends Model {
             $upd->execute([$qty, $productId]);
 
             $this->db->commit();
+            // Audit log (sale created - legacy single item)
+            try {
+                Audit::log('sale', (int)$saleId, 'create', [
+                    'mode' => 'single',
+                    'product_id' => (int)$productId,
+                    'qty' => (int)$qty,
+                    'unit_price' => (float)$unitPrice,
+                    'total' => (float)$total,
+                    'customer_name' => $customerName,
+                    'customer_phone' => $customerPhone,
+                    'customer_email' => $customerEmail,
+                ]);
+            } catch (\Throwable $ex) { /* silent */ }
             return $saleId;
         } catch (\Throwable $e) {
             $this->db->rollBack();
@@ -411,6 +425,17 @@ class Sale extends Model {
             $updSale->execute([$total, $saleId]);
 
             $this->db->commit();
+            // Audit log (sale created - cart)
+            try {
+                Audit::log('sale', (int)$saleId, 'create', [
+                    'mode' => 'cart',
+                    'items' => $norm,
+                    'total' => (float)$total,
+                    'customer_name' => $customerName,
+                    'customer_phone' => $customerPhone,
+                    'customer_email' => $customerEmail,
+                ]);
+            } catch (\Throwable $ex) { /* silent */ }
             return $saleId;
         } catch (\Throwable $e) {
             $this->db->rollBack();

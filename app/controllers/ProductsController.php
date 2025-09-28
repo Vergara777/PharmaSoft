@@ -139,8 +139,9 @@ class ProductsController extends Controller {
             }
         }
         $newId = (new Product())->create($d);
-        // Audit: product created
+        // Audit: product created (with friendly summary)
         Audit::log('product', (int)$newId, 'create', [
+            'summary' => 'Se creó el producto: ' . $d['name'] . ' (SKU ' . $d['sku'] . ')',
             'sku' => $d['sku'], 'name' => $d['name'], 'price' => $d['price'], 'stock' => $d['stock'], 'status' => $d['status']
         ]);
         Flash::success('Producto creado correctamente', 'Éxito', 6000, 'top-end');
@@ -226,7 +227,14 @@ class ProductsController extends Controller {
         // Normalize numeric strings
         foreach (['stock','price'] as $nk) { if (isset($before[$nk])) $before[$nk] = (int)$before[$nk]; }
         $changes = Audit::diff($before, $after, $keys);
-        if (!empty($changes)) { Audit::log('product', (int)$id, 'update', $changes); }
+        // Add friendly summary if there are changes
+        if (!empty($changes)) {
+            try {
+                $changedKeys = implode(', ', array_keys($changes));
+            } catch (\Throwable $e) { $changedKeys = ''; }
+            $changes['summary'] = 'Se actualizó el producto: ' . ($d['name'] ?: ('#' . (int)$id)) . ($changedKeys ? (' (cambios: ' . $changedKeys . ')') : '');
+            Audit::log('product', (int)$id, 'update', $changes);
+        }
         Flash::success('Producto actualizado correctamente', 'Éxito', 6000, 'top-end');
         $this->redirect('/products');
     }
@@ -236,9 +244,19 @@ class ProductsController extends Controller {
         if (!Auth::isAdmin()) { Flash::error('No tienes permisos para eliminar productos', 'Acceso denegado'); $this->redirect('/products'); return; }
         if (!Security::verifyCsrf($_POST['csrf'] ?? '')) { http_response_code(400); exit('CSRF'); }
         try {
-            $ok = (new Product())->delete((int)$id);
+            // fetch product to include name/sku in audit
+            $prodM = new Product();
+            $prodRow = $prodM->find((int)$id) ?: [];
+            $ok = $prodM->delete((int)$id);
             if ($ok) {
                 Flash::success('Producto eliminado', 'Acción completada');
+                // Audit: product deleted
+                $nm = trim((string)($prodRow['name'] ?? ''));
+                $sku = trim((string)($prodRow['sku'] ?? ''));
+                Audit::log('product', (int)$id, 'delete', [
+                    'summary' => 'Se eliminó el producto: ' . ($nm !== '' ? $nm : ('#' . (int)$id)) . ($sku !== '' ? (' (SKU ' . $sku . ')') : ''),
+                    'sku' => $sku, 'name' => $nm
+                ]);
             } else {
                 Flash::error('No se puede eliminar el producto porque tiene ventas asociadas. Puedes marcarlo como "Retirado" para ocultarlo del catálogo activo.', 'Operación no permitida');
             }
@@ -351,8 +369,17 @@ class ProductsController extends Controller {
         if (!Auth::check()) { $this->redirect('/auth/login'); }
         if (!Auth::isAdmin()) { Flash::error('No tienes permisos para reactivar productos', 'Acceso denegado'); $this->redirect('/products/retired'); return; }
         if (!Security::verifyCsrf($_POST['csrf'] ?? '')) { http_response_code(400); exit('CSRF'); }
-        (new Product())->reactivate((int)$id);
+        $prodM = new Product();
+        $row = $prodM->find((int)$id) ?: [];
+        $prodM->reactivate((int)$id);
         Flash::success('Producto reactivado', 'Éxito');
+        // Audit: reactivate
+        $nm = trim((string)($row['name'] ?? ''));
+        $sku = trim((string)($row['sku'] ?? ''));
+        Audit::log('product', (int)$id, 'reactivate', [
+            'summary' => 'Se reactivó el producto: ' . ($nm !== '' ? $nm : ('#' . (int)$id)) . ($sku !== '' ? (' (SKU ' . $sku . ')') : ''),
+            'sku' => $sku, 'name' => $nm
+        ]);
         $this->redirect('/products/retired');
     }
 
@@ -363,9 +390,54 @@ class ProductsController extends Controller {
         if (!Auth::check()) { $this->redirect('/auth/login'); }
         if (!Auth::isAdmin()) { Flash::error('No tienes permisos para desactivar productos', 'Acceso denegado'); $this->redirect('/products'); return; }
         if (!Security::verifyCsrf($_POST['csrf'] ?? '')) { http_response_code(400); exit('CSRF'); }
-        (new Product())->retire((int)$id);
+        $prodM = new Product();
+        $row = $prodM->find((int)$id) ?: [];
+        $prodM->retire((int)$id);
         Flash::success('Producto desactivado (retirado) correctamente', 'Éxito');
+        // Audit: retire
+        $nm = trim((string)($row['name'] ?? ''));
+        $sku = trim((string)($row['sku'] ?? ''));
+        Audit::log('product', (int)$id, 'retire', [
+            'summary' => 'Se retiró el producto: ' . ($nm !== '' ? $nm : ('#' . (int)$id)) . ($sku !== '' ? (' (SKU ' . $sku . ')') : ''),
+            'sku' => $sku, 'name' => $nm
+        ]);
         $this->redirect('/products');
+    }
+
+    /**
+     * Producto en formato JSON (para modal en Movimientos)
+     */
+    public function show($id): void {
+        if (!Auth::check()) { $this->redirect('/auth/login'); }
+        if (!Auth::isAdmin()) { http_response_code(403); exit('No autorizado'); }
+        $id = (int)$id;
+        $row = (new Product())->find($id);
+        header('Content-Type: application/json; charset=utf-8');
+        if (!$row) {
+            http_response_code(404);
+            echo json_encode(['ok'=>false,'message'=>'Producto no encontrado']);
+            return;
+        }
+        $img = $row['image'] ?? null;
+        $imgUrl = $img ? (rtrim(BASE_URL,'/') . '/uploads/' . $img) : null;
+        echo json_encode([
+            'ok' => true,
+            'product' => [
+                'id' => (int)($row['id'] ?? 0),
+                'sku' => (string)($row['sku'] ?? ''),
+                'name' => (string)($row['name'] ?? ''),
+                'description' => (string)($row['description'] ?? ''),
+                'image' => $imgUrl,
+                'stock' => (int)($row['stock'] ?? 0),
+                'price' => (int)($row['price'] ?? 0),
+                'expires_at' => ($row['expires_at'] ?? null),
+                'status' => (string)($row['status'] ?? ''),
+                'category_id' => isset($row['category_id']) ? (int)$row['category_id'] : null,
+                'supplier_id' => isset($row['supplier_id']) ? (int)$row['supplier_id'] : null,
+                'created_at' => (string)($row['created_at'] ?? ''),
+                'updated_at' => (string)($row['updated_at'] ?? ''),
+            ]
+        ], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
     }
 }
 

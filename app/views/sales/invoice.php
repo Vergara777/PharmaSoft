@@ -166,6 +166,56 @@
       }
     })();
   </script>
+  <!-- Post-success: clear carts and drafts so the cart is empty after sale -->
+  <script>
+    (function(){
+      try {
+        // 1) Clear floating cart implementations if present
+        if (window.psCart && typeof window.psCart.clear === 'function') {
+          window.psCart.clear();
+        } else if (window.psCart && typeof window.psCart.refresh === 'function') {
+          // Fallback to refresh if clear is not available
+          window.psCart.refresh();
+        }
+      } catch(_){}
+      try {
+        if (window.cart && typeof window.cart.clear === 'function') {
+          window.cart.clear();
+        } else if (window.cart && typeof window.cart.update === 'function') {
+          window.cart.update();
+        }
+      } catch(_){}
+
+      try {
+        // 2) Remove localStorage drafts/old carts for all users
+        for (var i = localStorage.length - 1; i >= 0; i--) {
+          var k = localStorage.key(i) || '';
+          if (k.indexOf('pharmasoft_sales_draft_') === 0 ||
+              k.indexOf('pharmasoft_cart_') === 0 ||
+              k === 'pharmasoft_pending_cart') {
+            try { localStorage.removeItem(k); } catch(_){}
+          }
+        }
+      } catch(_){}
+
+      try {
+        // 3) Brief toast to confirm cart was cleared
+        if (window.Swal && Swal.fire) {
+          Swal.fire({
+            icon: 'success',
+            title: 'Carrito vaciado',
+            text: 'El carrito se vació después de realizar la venta.',
+            toast: true,
+            position: 'top-end',
+            timer: 3000,
+            showConfirmButton: false
+          });
+        } else if (typeof window.notify === 'function') {
+          notify({ icon: 'success', title: 'Carrito vaciado', text: 'El carrito se vació después de realizar la venta.', position: 'top-end', timer: 3000 });
+        }
+      } catch(_){}
+    })();
+  </script>
   <?php $___fl = \App\Helpers\Flash::popAll(); if (!empty($___fl)): ?>
   <script>
     (function(){

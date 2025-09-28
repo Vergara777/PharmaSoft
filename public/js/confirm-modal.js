@@ -15,7 +15,13 @@
         cancelButtonText: cancel,
         confirmButtonColor: '#d33',
         cancelButtonColor: '#6c757d'
-      }).then(function(r){ return !!r.isConfirmed; });
+      }).then(function(r){
+        try {
+          // Support multiple SweetAlert2 result formats
+          if (r && (r.isConfirmed === true || r.value === true)) return true;
+          return false;
+        } catch(_) { return false; }
+      });
     }
     // Fallback minimal modal
     return new Promise(function(resolve){

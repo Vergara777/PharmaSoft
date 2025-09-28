@@ -23,7 +23,7 @@
   </div>
   <div class="col-lg-3 col-6">
     <div class="small-box bg-warning">
-      <div class="inner"><h3><?= View::e($expiringSoon ?? 0) ?></h3><p>Por vencer (30d)</p></div>
+      <div class="inner"><h3><?= View::e($expiringSoon ?? 0) ?></h3><p>Por vencer (31d)</p></div>
       <div class="icon"><i class="fas fa-clock"></i></div>
       <a href="<?= BASE_URL ?>/products/expiring-30" class="small-box-footer">Ver <i class="fas fa-arrow-circle-right"></i></a>
     </div>
@@ -119,7 +119,7 @@
   <div class="mr-3">
     <strong>Resumen de inventario:</strong>
     <span class="badge badge-danger ml-2"><i class="fas fa-ban mr-1" aria-hidden="true"></i> Vencidos: <?= View::e($expired ?? 0) ?></span>
-    <span class="badge badge-warning ml-2"><i class="fas fa-clock mr-1" aria-hidden="true"></i> Por vencer (30d): <?= View::e($expiringSoon ?? 0) ?></span>
+    <span class="badge badge-warning ml-2"><i class="fas fa-clock mr-1" aria-hidden="true"></i> Por vencer (31d): <?= View::e($expiringSoon ?? 0) ?></span>
     <span class="badge badge-danger ml-2"><i class="fas fa-times-circle mr-1" aria-hidden="true"></i> Sin stock: <?= View::e($zeroStock ?? 0) ?></span>
     <span class="badge badge-warning ml-2"><i class="fas fa-exclamation-triangle mr-1" aria-hidden="true"></i> Bajo stock (≤ <?= defined('LOW_STOCK_THRESHOLD') ? (int)LOW_STOCK_THRESHOLD : 5 ?>): <?= View::e($lowStock ?? 0) ?></span>
     <?php $okInv = max(0, (int)$totalProducts - (int)($lowStock ?? 0)); ?>

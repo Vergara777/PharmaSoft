@@ -3,17 +3,18 @@
   <div class="card-header">
     <h3 class="card-title d-flex align-items-center">
       <i class="fas fa-cart-plus mr-2 text-primary" aria-hidden="true"></i>
-      Registrar venta
+      Realizar venta
     </h3>
   <!-- Choices.js script include placed before page scripts to ensure availability -->
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 </div>
   <div class="card-body">
     <style>
-      /* Mostrar opciones vencidas en rojo en el desplegable */
-      select[name="product_pick"] option[data-expired="1"] { color: #dc3545 !important; font-weight: 600; }
-      /* Próximo a vencer (≤30 días) en amarillo */
-      select[name="product_pick"] option[data-status="warn"] { color: #d39e00 !important; font-weight: 600; }
+      /* Mostrar opciones vencidas en azul en el desplegable nativo */
+      select[name="product_pick"] option[data-expired="1"],
+      select[name="product_pick"] option[data-status="expired"] { color: #007bff !important; font-weight: 600; }
+      /* Próximo a vencer (≤31 días) en amarillo */
+      select[name="product_pick"] option[data-status="exp_warn"] { color: #d39e00 !important; font-weight: 600; }
       /* Ok en verde */
       select[name="product_pick"] option[data-status="ok"] { color: #28a745 !important; }
       .cart-table td, .cart-table th { vertical-align: middle; }
@@ -49,8 +50,13 @@
       /* Status-based colors inside Choices (lighter weights for smoother layout) */
       .stock-ok .choice__text, .choice__text.stock-ok { color:#28a745; }
       .stock-warn .choice__text, .choice__text.stock-warn { color:#d39e00; font-weight:500; }
-      .stock-expired .choice__text, .choice__text.stock-expired { color:#dc3545; font-weight:500; }
+      /* Expired: blue color as requested */
+      .stock-expired .choice__text, .choice__text.stock-expired { color:#007bff; font-weight:600; }
       .stock-low .choice__text, .choice__text.stock-low { color:#dc3545; font-weight:500; }
+      /* Near-expiry highlight */
+      .exp-warn .choice__text, .choice__text.exp-warn { color:#d39e00; font-weight:600; }
+      .choice__tag { margin-left:6px; font-size:.85em; font-weight:600; }
+      .choice__tag.tag-expired { color:#007bff; }
       /* Reduce label spacing to bring inputs up */
       .form-row .form-group > label { margin-bottom:.2rem !important; }
       /* Normalize control heights in the row */
@@ -110,10 +116,12 @@
       /* Align labels spacing */
       .form-group > label.mb-1 { margin-bottom: .25rem !important; }
       /* Centered loading overlay */
-      #centerLoading { position: fixed; inset: 0; display: none; z-index: 1100; background: rgba(0,0,0,.35); align-items: center; justify-content: center; }
+      #centerLoading { position: fixed; inset: 0; display: none; z-index: 5000; background: rgba(0,0,0,.35); align-items: center; justify-content: center; cursor: wait; user-select: none; }
       #centerLoading .box { background: #fff; color: #1f2d3d; padding: 14px 18px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25); font-weight: 700; display: inline-flex; align-items: center; gap: .6rem; }
       #centerLoading .box .spinner { width: 1rem; height: 1rem; border: 2px solid #3c8dbc; border-top-color: transparent; border-radius: 50%; animation: sp 1s linear infinite; }
       @keyframes sp { to { transform: rotate(360deg); } }
+      /* When blocking is active, prevent scroll at root level */
+      html.cl-block, body.cl-block { overflow: hidden !important; touch-action: none !important; overscroll-behavior: contain !important; }
       /* Smooth open/close for item detail modal (slower, softer) */
       #itemDetailModal { opacity: 0; transition: opacity .65s ease; }
       #itemDetailModal.show { opacity: 1; }
@@ -170,7 +178,7 @@
             if (window.Swal && Swal.fire) {
               Swal.fire({
                 icon: 'error',
-                title: 'Error al registrar venta',
+                title: 'Error al realizar venta',
                 text: String(msg || ''),
                 position: 'top-end',
                 toast: true,
@@ -180,7 +188,7 @@
               });
             } else if (typeof window.notify === 'function') {
               // Fallback to notify() API if available
-              try { notify({ icon: 'error', title: 'Error al registrar venta', text: String(msg||''), position: 'top-end', timer: 4000 }); } catch(_){ notify('error', String(msg||'')); }
+              try { notify({ icon: 'error', title: 'Error al realizar venta', text: String(msg||''), position: 'top-end', timer: 4000 }); } catch(_){ notify('error', String(msg||'')); }
             }
           } catch(_){ /* ignore */ }
           // Highlight product selector for stock/expiry errors
@@ -195,7 +203,7 @@
         })();
       </script>
     <?php endif; ?>
-    <form method="post" action="<?= BASE_URL ?>/sales/store" data-loading-text="Guardando venta..." id="cartForm">
+    <form method="post" action="<?= BASE_URL ?>/sales/store" data-loading-text="Realizando venta..." class="js-confirmable" data-confirm-title="Confirmar venta" data-confirm-text="¿Deseas realizar esta venta?" data-confirm-ok="Sí, realizar" data-confirm-cancel="No" id="cartForm">
       <input type="hidden" name="csrf" value="<?= Security::csrfToken() ?>">
       <div class="form-row align-items-center pickers">
         <div class="form-group col-12 col-md-4 col-lg-4 mb-0 pick-col pick-col-cat">
@@ -215,35 +223,75 @@
           <select name="product_pick" class="form-control">
             <option value="">Seleccione un producto</option>
             <?php
-              $today = (new DateTimeImmutable('today'))->format('Y-m-d');
+              $todayDT = new DateTimeImmutable('today');
+              $today = $todayDT->format('Y-m-d');
               $catMap = [];
               if (!empty($categories ?? [])) { foreach (($categories ?? []) as $c) { $catMap[(int)($c['id'] ?? 0)] = (string)($c['name'] ?? ''); } }
               $supMap = [];
               if (!empty($suppliers ?? [])) { foreach (($suppliers ?? []) as $s) { $supMap[(int)($s['id'] ?? 0)] = (string)($s['name'] ?? ''); } }
               foreach ($products as $pr):
                 $expires = $pr['expires_at'] ?? null;
-                $isExpired = !empty($expires) && $expires < $today;
+                $expDT = null;
+                try { if (!empty($expires)) { $expDT = new DateTimeImmutable($expires); } } catch (Exception $e) { $expDT = null; }
+                $isExpired = ($expDT instanceof DateTimeImmutable) ? ($expDT <= $todayDT) : false;
                 $label = $pr['sku'] . ' - ' . $pr['name'];
-                // Status: expired takes precedence; otherwise by stock thresholds
+                // Status precedence: expired > expire-soon (≤31 days) > stock thresholds
                 $status = 'ok';
+                $expireDays = '';
                 if ($isExpired) { $label .= ' (Vencido)'; $status = 'expired'; }
                 else {
-                  $stk = (int)($pr['stock'] ?? 0);
-                  if ($stk <= 20) { $status = 'low'; }
-                  elseif ($stk <= 50) { $status = 'warn'; }
-                  else { $status = 'ok'; }
+                  // Check if expiration is within 31 days (inclusive)
+                  if ($expDT instanceof DateTimeImmutable) {
+                    $diffDays = (int)$todayDT->diff($expDT)->days;
+                    $expireDays = (string)$diffDays;
+                    if ($diffDays >= 1 && $diffDays <= 31) {
+                      $status = 'exp_warn';
+                    }
+                  }
+                  // If not warn by expiry, fallback to stock-based status
+                  if ($status === 'ok') {
+                    $stk = (int)($pr['stock'] ?? 0);
+                    if ($stk <= 20) { $status = 'low'; }
+                    elseif ($stk <= 50) { $status = 'stock_warn'; }
+                    else { $status = 'ok'; }
+                  }
                 }
                 $catId = (int)($pr['category_id'] ?? 0);
                 $supId = (int)($pr['supplier_id'] ?? 0);
                 $catName = isset($catMap[$catId]) && $catMap[$catId] !== '' ? $catMap[$catId] : '';
                 $supName = isset($supMap[$supId]) && $supMap[$supId] !== '' ? $supMap[$supId] : '';
             ?>
-              <option value="<?= View::e($pr['id']) ?>" data-sku="<?= View::e($pr['sku']) ?>" data-name="<?= View::e($pr['name']) ?>" data-description="<?= View::e($pr['description'] ?? '') ?>" data-price="<?= View::e((int)($pr['price'] ?? 0)) ?>" data-image="<?= View::e($pr['image'] ?? '') ?>" data-expired="<?= $isExpired ? '1' : '0' ?>" data-status="<?= View::e($status) ?>" data-stock="<?= View::e($pr['stock'] ?? 0) ?>" data-category-id="<?= $catId ?>" data-category-name="<?= View::e($catName) ?>" data-supplier-id="<?= $supId ?>" data-supplier-name="<?= View::e($supName) ?>" title="<?= $isExpired ? 'Producto vencido' : ('Stock: ' . (int)($pr['stock'] ?? 0)) ?>">
+              <?php
+                $cp = [
+                  'status' => $status,
+                  'stock' => (int)($pr['stock'] ?? 0),
+                  'image' => (string)($pr['image'] ?? ''),
+                  'expired' => $isExpired ? '1' : '0',
+                  'no_stock' => ((int)($pr['stock'] ?? 0) <= 0) ? '1' : '0',
+                ];
+                $cp_json = htmlspecialchars(json_encode($cp, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8');
+              ?>
+              <option value="<?= View::e($pr['id']) ?>"
+                data-sku="<?= View::e($pr['sku']) ?>"
+                data-name="<?= View::e($pr['name']) ?>"
+                data-description="<?= View::e($pr['description'] ?? '') ?>"
+                data-price="<?= View::e((int)($pr['price'] ?? 0)) ?>"
+                data-image="<?= View::e($pr['image'] ?? '') ?>"
+                data-expired="<?= $isExpired ? '1' : '0' ?>"
+                data-status="<?= View::e($status) ?>"
+                data-expire-days="<?= View::e($expireDays) ?>"
+                data-stock="<?= View::e($pr['stock'] ?? 0) ?>"
+                data-category-id="<?= $catId ?>"
+                data-category-name="<?= View::e($catName) ?>"
+                data-supplier-id="<?= $supId ?>"
+                data-supplier-name="<?= View::e($supName) ?>"
+                data-custom-properties='<?= $cp_json ?>'
+                title="<?= $isExpired ? 'Producto vencido' : ('Stock: ' . (int)($pr['stock'] ?? 0)) ?>">
                 <?= View::e($label) ?>
               </option>
             <?php endforeach; ?>
           </select>
-          <small class="form-text text-muted d-block d-md-none">Los productos vencidos se muestran en rojo. Al seleccionarlos, verás un aviso y no podrás agregarlos.</small>
+          <small class="form-text text-muted d-block d-md-none">Los productos vencidos se muestran en azul y no se pueden agregar. Los próximos a vencer se muestran en amarillo.</small>
           <div id="pickPreview">
             <img id="pickImg" alt="Imagen producto">
             <div class="meta">
@@ -269,7 +317,7 @@
           <label class="d-none d-md-block mb-1">&nbsp;</label>
           <button type="button" class="btn btn-success btn-block w-100" id="btnAddItem">
             <i class="fas fa-plus mr-1" aria-hidden="true"></i>
-            Agregar
+            Agregar al carrito
           </button>
         </div>
       </div>
@@ -316,9 +364,9 @@
       </div>
 
       <div class="cart-actions mt-2">
-      <button class="btn btn-primary">
+      <button type="submit" class="btn btn-primary">
         <i class="fas fa-save mr-1" aria-hidden="true"></i>
-        Guardar venta
+        Realizar venta
       </button>
       <button type="button" class="btn btn-outline-primary" id="btnSaveDraft">
         <i class="fas fa-bookmark mr-1" aria-hidden="true"></i>
@@ -328,7 +376,7 @@
         <i class="fas fa-store mr-1" aria-hidden="true"></i>
         Seguir viendo productos
       </a>
-      <a class="btn btn-secondary" href="<?= BASE_URL ?>/sales">
+      <a class="btn btn-secondary" id="btnCancelSale" href="<?= BASE_URL ?>/sales">
         <i class="fas fa-times mr-1" aria-hidden="true"></i>
         Cancelar
       </a>
@@ -352,14 +400,59 @@
       if (typeof minMs === 'number' && minMs >= 0) { __clMin = Math.max(0, Math.floor(minMs)); }
       if (__clTimer) { try { clearTimeout(__clTimer); } catch(_){ } __clTimer = null; }
       if (__clWrap) { __clWrap.style.display = 'flex'; __clWrap.setAttribute('aria-hidden','false'); }
+      // Activate global blocking (no scroll, no key scroll)
+      try {
+        document.documentElement.classList.add('cl-block');
+        document.body && document.body.classList.add('cl-block');
+      } catch(_){ }
+      // Attach event blockers
+      try {
+        window.__clWheelHandler = function(e){ e.preventDefault(); e.stopPropagation(); };
+        window.__clTouchHandler = function(e){ e.preventDefault(); e.stopPropagation(); };
+        window.__clPointerHandler = function(e){ e.preventDefault(); e.stopPropagation(); };
+        window.__clKeyHandler = function(e){
+          var k = e.key;
+          if (!k) return;
+          // Block common scroll keys
+          if (k === ' ' || k === 'Spacebar' || k === 'PageUp' || k === 'PageDown' || k === 'ArrowUp' || k === 'ArrowDown' || k === 'Home' || k === 'End') {
+            e.preventDefault(); e.stopPropagation();
+          }
+        };
+        window.addEventListener('wheel', window.__clWheelHandler, { passive: false, capture: true });
+        window.addEventListener('touchmove', window.__clTouchHandler, { passive: false, capture: true });
+        window.addEventListener('keydown', window.__clKeyHandler, true);
+        if (__clWrap) {
+          __clWrap.addEventListener('pointerdown', window.__clPointerHandler, true);
+          __clWrap.addEventListener('mousedown', window.__clPointerHandler, true);
+          __clWrap.addEventListener('click', window.__clPointerHandler, true);
+        }
+      } catch(_){ }
       __clActive = true; __clStarted = Date.now();
     }
     function clHide(){
       if (!__clActive) { if (__clWrap) { __clWrap.style.display = 'none'; __clWrap.setAttribute('aria-hidden','true'); } return; }
       var elapsed = Math.max(0, Date.now() - __clStarted);
       var remaining = Math.max(0, __clMin - elapsed);
-      if (remaining > 0){ __clTimer = setTimeout(function(){ __clActive=false; if (__clWrap){ __clWrap.style.display='none'; __clWrap.setAttribute('aria-hidden','true'); } }, remaining); }
-      else { __clActive=false; if (__clWrap){ __clWrap.style.display='none'; __clWrap.setAttribute('aria-hidden','true'); } }
+      function __doHide(){
+        __clActive=false;
+        if (__clWrap){ __clWrap.style.display='none'; __clWrap.setAttribute('aria-hidden','true'); }
+        // Remove global blockers
+        try {
+          document.documentElement.classList.remove('cl-block');
+          document.body && document.body.classList.remove('cl-block');
+          if (window.__clWheelHandler) { window.removeEventListener('wheel', window.__clWheelHandler, { capture: true }); }
+          if (window.__clTouchHandler) { window.removeEventListener('touchmove', window.__clTouchHandler, { capture: true }); }
+          if (window.__clKeyHandler) { window.removeEventListener('keydown', window.__clKeyHandler, true); }
+          if (window.__clPointerHandler && __clWrap) {
+            __clWrap.removeEventListener('pointerdown', window.__clPointerHandler, true);
+            __clWrap.removeEventListener('mousedown', window.__clPointerHandler, true);
+            __clWrap.removeEventListener('click', window.__clPointerHandler, true);
+          }
+          window.__clWheelHandler = window.__clTouchHandler = window.__clKeyHandler = window.__clPointerHandler = null;
+        } catch(_){ }
+      }
+      if (remaining > 0){ __clTimer = setTimeout(__doHide, remaining); }
+      else { __doHide(); }
     }
     window.centerLoading = { show: clShow, hide: clHide };
     // CSS.escape polyfill (MDN) to ensure compatibility across browsers
@@ -422,6 +515,8 @@
     const totalEl = document.getElementById('cartTotal');
     const form = document.getElementById('cartForm');
     const submitBtn = form ? form.querySelector('button[type="submit"], button:not([type])') : null;
+    // Submission guard to avoid watchers clearing the UI while we submit
+    var __salesSubmitting = false;
     // Import CSV controls fueron movidos a Ventas del día
 
     function centerNotify(optsOrType, maybeTitle, maybeText){
@@ -614,7 +709,7 @@
         q = ds; qty.value = String(q);
         centerToast4('error','Stock insuficiente','Disponible: ' + ds + ', solicitado: ' + origQ + '. Se ajustó a ' + ds + '.');
       }
-      // Prompt on selection (only once per product within a short window)
+      // Non-blocking notices on selection (avoid confirmation modals here)
       try {
         window.__selectPromptGuard = window.__selectPromptGuard || { pid: 0, ts: 0 };
         var now = Date.now();
@@ -622,31 +717,27 @@
         if (pidNow && guardOk) {
           window.__selectPromptGuard.pid = pidNow; window.__selectPromptGuard.ts = now;
           if (status === 'expired') {
-            confirmPretty({
-              icon: 'error',
-              title: 'Producto vencido',
-              text: 'No se puede continuar agregar el producto porque está vencido.',
-              ok: 'Aceptar',
-              cancel: false
-            }).then(function(){
-              // Clear selection on acknowledge
-              if (sel) {
-                sel.value = '';
-                if (typeof __choicesInst !== 'undefined' && __choicesInst) {
-                  __choicesInst.removeActiveItems();
-                  __choicesInst.setChoiceByValue('');
-                }
-                updatePickerFromSelection();
+            // Show toast and clear selection without blocking
+            centerToast4('error','Producto vencido','No puedes agregar este producto.');
+            if (sel) {
+              sel.value = '';
+              if (typeof __choicesInst !== 'undefined' && __choicesInst) {
+                __choicesInst.removeActiveItems();
+                __choicesInst.setChoiceByValue('');
               }
-            });
-          } else if (status === 'warn') {
-            confirmPretty({
-              icon: 'warning',
-              title: 'Próximo a vencer',
-              text: 'Este producto está próximo a vencer. ¿Deseas continuar?',
-              ok: 'Aceptar',
-              cancel: 'Cancelar'
-            }).then(function(yes){ if (!yes && sel) { sel.value = ''; if (typeof __choicesInst !== 'undefined' && __choicesInst) { __choicesInst.removeActiveItems(); __choicesInst.setChoiceByValue(''); } updatePickerFromSelection(); }});
+              updatePickerFromSelection();
+            }
+          } else if (status === 'exp_warn') {
+            // Informative, do not block interaction (expiry)
+            try {
+              var dleft = sel && sel.selectedOptions && sel.selectedOptions[0] ? parseInt(sel.selectedOptions[0].getAttribute('data-expire-days')||'0',10) : NaN;
+              var sDay = (dleft === 1 ? 'día' : 'días');
+              if (!isNaN(dleft)) centerToast4('warning','Por vencer','Faltan ' + dleft + ' ' + sDay + ' para vencer.');
+              else centerToast4('warning','Por vencer','Este producto está próximo a vencer.');
+            } catch(_){ centerToast4('warning','Por vencer','Este producto está próximo a vencer.'); }
+          } else if (status === 'stock_warn') {
+            // Stock medium warning
+            centerToast4('info','Próximo a acabarse','Quedan pocas unidades en stock.');
           }
         }
       } catch(_){ }
@@ -654,7 +745,8 @@
     function badgeFor(status){
       if (status === 'expired') return '<span class="badge badge-danger ml-2"><i class="fas fa-ban mr-1" aria-hidden="true"></i>Vencido</span>';
       if (status === 'low') return '<span class="badge badge-danger ml-2"><i class="fas fa-exclamation-circle mr-1" aria-hidden="true"></i>Stock bajo</span>';
-      if (status === 'warn') return '<span class="badge badge-warning ml-2"><i class="fas fa-exclamation-triangle mr-1" aria-hidden="true"></i>Stock medio</span>';
+      if (status === 'stock_warn') return '<span class="badge badge-warning ml-2"><i class="fas fa-exclamation-triangle mr-1" aria-hidden="true"></i>Próximo a acabarse</span>';
+      if (status === 'exp_warn') return '<span class="badge badge-warning ml-2"><i class="fas fa-hourglass-half mr-1" aria-hidden="true"></i>Por vencer</span>';
       return '<span class="badge badge-success ml-2"><i class="fas fa-check mr-1" aria-hidden="true"></i>OK</span>';
     }
     // Preview-only: show stock quantity with color-coded label next to the name
@@ -663,7 +755,8 @@
       var cls = 'badge-success';
       var txt = 'Stock: ' + q;
       if (status === 'low') { cls = 'badge-danger'; txt = 'Stock bajo: ' + q; }
-      else if (status === 'warn') { cls = 'badge-warning'; txt = 'Próximo a acabarse: ' + q; }
+      else if (status === 'stock_warn') { cls = 'badge-warning'; txt = 'Próximo a acabarse: ' + q; }
+      else if (status === 'exp_warn') { cls = 'badge-warning'; txt = 'Por vencer'; }
       else if (status === 'expired') { cls = 'badge-danger'; txt = 'Vencido'; }
       return '<span class="badge ml-2 ' + cls + '">' + txt + '</span>';
     }
@@ -745,8 +838,6 @@
       recalc();
     }
     function addItem(){
-      // Centered loading with minimum 4–6 seconds (using 4000ms minimum)
-      try { centerLoading.show('Agregando...', 4000); } catch(_){ }
       // Resolve selected option robustly (in case of Choices.js)
       let opt = null; let cp = null;
       if (sel) {
@@ -761,13 +852,15 @@
           }
         } catch(_){ }
       }
+      // Early guard: if no product selected, do not show loader; just notify
+      const pidEarly = parseInt(opt && opt.value ? opt.value : '0', 10) || 0;
+      if (!pidEarly) { centerToast4('warning','Elige un producto por favor',''); return; }
       // Defensive: block zero-stock selection
       try {
         var st0 = 0;
         if (opt && opt.hasAttribute('data-stock')) st0 = parseInt(opt.getAttribute('data-stock')||'0', 10) || 0;
         else if (cp && typeof cp.stock !== 'undefined') st0 = parseInt(cp.stock||'0', 10) || 0;
         if (st0 <= 0) {
-          try { centerLoading.hide(); } catch(_){ }
           // Clear selection to placeholder
           if (typeof __choicesInst !== 'undefined' && __choicesInst) {
             if (typeof __choicesInst.removeActiveItems === 'function') __choicesInst.removeActiveItems();
@@ -778,38 +871,44 @@
           return;
         }
       } catch(_){ }
-      const pid = parseInt(opt && opt.value ? opt.value : '0', 10);
-      if (!pid) { centerNotify('warning','Aviso','Selecciona un producto'); try { centerLoading.hide(); } catch(_){ } return; }
+      const pid = pidEarly;
       // Status detection regardless of native <option> or Choices.js
       var status = (opt && opt.getAttribute('data-status')) || (cp ? cp.status : 'ok') || 'ok';
       // Handle expired: show blocking modal and do not add
       if (status === 'expired') {
-        // Switch to canceling state centered; shorter min time
-        try { centerLoading.show('Cancelando...', 1500); } catch(_){ }
-        try { centerLoading.hide(); } catch(_){ }
-        return void confirmPretty({ icon:'error', title:'Producto vencido', text:'No se puede continuar agregar el producto porque está vencido.', ok:'Aceptar', cancel:false })
-          .then(function(){
-            // Clear selection after acknowledge to avoid accidental re-add
-            if (sel) {
-              sel.value = '';
-              if (typeof __choicesInst !== 'undefined' && __choicesInst) {
-                __choicesInst.removeActiveItems();
-                __choicesInst.setChoiceByValue('');
-              }
-              updatePickerFromSelection();
-            }
-          });
+        // Non-blocking: notify and clear selection; do not add
+        centerToast4('error','Producto vencido','No puedes agregar este producto.');
+        if (sel) {
+          sel.value = '';
+          if (typeof __choicesInst !== 'undefined' && __choicesInst) {
+            __choicesInst.removeActiveItems();
+            __choicesInst.setChoiceByValue('');
+          }
+          updatePickerFromSelection();
+        }
+        return;
       }
-      // Handle warn: ask user before proceeding
-      if (status === 'warn') {
-        try { centerLoading.hide(); } catch(_){ }
-        return void confirmPretty({ icon:'warning', title:'Próximo a vencer', text:'Este producto está próximo a vencer. ¿Deseas continuar?', ok:'Aceptar', cancel:'Cancelar' })
-          .then(function(yes){ if (yes) actuallyAdd(); });
+      // Expiration warn: proceed automatically after showing a toast (no confirmation modal)
+      if (status === 'exp_warn') {
+        try {
+          var dleft2 = opt && opt.hasAttribute('data-expire-days') ? parseInt(opt.getAttribute('data-expire-days')||'0',10) : NaN;
+          var sDay2 = (dleft2 === 1 ? 'día' : 'días');
+          if (!isNaN(dleft2)) centerToast4('warning','Por vencer','Agregando: faltan ' + dleft2 + ' ' + sDay2 + '.');
+          else centerToast4('warning','Por vencer','Agregando producto próximo a vencer.');
+        } catch(_){ centerToast4('warning','Por vencer','Agregando producto próximo a vencer.'); }
+        // fall-through to actuallyAdd()
+      }
+      // Stock warn (medium): proceed automatically with info toast
+      if (status === 'stock_warn') {
+        centerToast4('info','Próximo a acabarse','Agregando producto con stock medio.');
+        // fall-through to actuallyAdd()
       }
       // OK -> add directly
       actuallyAdd();
 
       function actuallyAdd(){
+        // Show loader only when we are actually adding a valid product
+        try { centerLoading.show('Agregando...', 4000); } catch(_){ }
         const sku = (opt && (opt.getAttribute('data-sku'))) || (cp ? cp.sku : '') || '';
         const name = (opt && (opt.getAttribute('data-name') || opt.textContent.trim())) || (cp ? cp.name : '') || '';
         const desc = (opt && (opt.getAttribute('data-description'))) || (cp ? cp.description : '') || '';
@@ -997,18 +1096,20 @@
         // Build explicit choices from existing <option>s, but KEEP ONLY those that have image to avoid duplicates without images
         var placeholderOpt = null;
         try { placeholderOpt = sel.querySelector('option[value=""]') || null; } catch(_){ }
-        var all = [];
-        Array.prototype.forEach.call(sel.options, function(o){
-          if (!o) return;
-          if (!o.value) { if (!placeholderOpt) placeholderOpt = o; return; }
-          var img = o.getAttribute('data-image') || '';
-          // Do NOT skip items without image; include them so category filtering shows all
+        var all = Array.prototype.map.call(sel.options, function(o){
+          if (!o || !o.value) return null;
           var stRaw = o.getAttribute('data-stock') || '';
-          var stNum = parseInt(stRaw, 10) || 0;
-          all.push({
+          var img = o.getAttribute('data-image') || '';
+          var stNum = parseInt(stRaw||'0',10) || 0;
+          var stOk = (stNum > 50);
+          var stWarn = (stNum > 20 && stNum <= 50);
+          var stLow = (stNum <= 20);
+          var isExpired = (o.getAttribute('data-expired') === '1') || (o.getAttribute('data-status') === 'expired');
+          return {
             value: o.value,
-            label: o.textContent.trim(),
-            disabled: o.disabled,
+            label: o.textContent,
+            // Do NOT disable expired here so they remain visible; selection is blocked via JS guards
+            disabled: !!o.disabled,
             // Never carry selection state from original <option>s
             selected: false,
             customProperties: {
@@ -1023,12 +1124,13 @@
               category_name: o.getAttribute('data-category-name') || '',
               supplier_id: o.getAttribute('data-supplier-id') || '',
               supplier_name: o.getAttribute('data-supplier-name') || '',
-              no_stock: (stNum <= 0) ? '1' : '0'
+              no_stock: (stNum <= 0) ? '1' : '0',
+              expired: isExpired ? '1' : '0',
+              color_class: (isExpired ? 'stock-expired' : (stLow ? 'stock-low' : (stWarn ? 'stock-warn' : 'stock-ok')))
             }
-          });
+          };
         });
-        // Clear current <option>s to prevent duplicates (we will feed Choices with filtered data)
-        try { sel.innerHTML = ''; if (placeholderOpt) sel.appendChild(placeholderOpt); } catch(_){ }
+        // Initialize Choices on existing native <option>s (do NOT clear them)
         __choicesInst = new Choices(sel, {
           searchEnabled: true,
           placeholder: true,
@@ -1044,7 +1146,8 @@
           itemSelectText: '',
           removeItemButton: false,
           allowHTML: true,
-          choices: all,
+          // Provide initial choices so list is populated immediately
+          choices: (all || []).filter(Boolean),
           callbackOnCreateTemplates: function(template) {
             return {
               item: function(classNames, d) {
@@ -1053,9 +1156,23 @@
                 var sku = (d.customProperties && d.customProperties.sku) || '';
                 var imgName = (d.customProperties && d.customProperties.image) || '';
                 if (imgName) img = '<img class="choice__img" src="<?= BASE_URL ?>/uploads/' + imgName + '" alt="" width="28" height="28" decoding="async" loading="lazy" fetchpriority="low">';
-                var statusClass = status ? (' stock-' + status) : '';
+                var statusClass = '';
+                try {
+                  var cp = d.customProperties || {};
+                  var color = cp.color_class || '';
+                  if (!color) {
+                    var stv = parseInt(cp.stock||'0',10) || 0;
+                    var expired = (status === 'expired') || String(cp.expired||'0') === '1';
+                    color = expired ? 'stock-expired' : (stv <= 20 ? 'stock-low' : (stv <= 50 ? 'stock-warn' : 'stock-ok'));
+                  }
+                  statusClass = ' ' + color;
+                  // If near-expiry, add explicit exp-warn class for yellow emphasis
+                  if ((cp.status||status) === 'exp_warn') statusClass += ' exp-warn';
+                } catch(_){ }
                 var skuHtml = sku ? ('<span class="choice__sku">' + sku + ' ·</span>') : '';
-                return template('<div class="' + classNames.item + ' ' + (d.highlighted ? classNames.highlightedState : classNames.itemSelectable) + statusClass + '" data-item data-id="' + d.id + '" data-value="' + d.value + '" ' + (d.active ? 'aria-selected="true"' : '') + (d.disabled ? ' aria-disabled="true"' : '') + '><div class="choice__inner">' + img + skuHtml + '<span class="choice__text' + statusClass + '">' + d.label + '</span></div></div>');
+                var expTag = '';
+                try { var cp2 = d.customProperties || {}; var isExp2 = (status === 'expired') || String(cp2.expired||'0') === '1'; if (isExp2) expTag = '<span class="choice__tag tag-expired">Vencido</span>'; } catch(_){ }
+                return template('<div class="' + classNames.item + ' ' + (d.highlighted ? classNames.highlightedState : classNames.itemSelectable) + statusClass + '" data-item data-id="' + d.id + '" data-value="' + d.value + '" ' + (d.active ? 'aria-selected="true"' : '') + (d.disabled ? ' aria-disabled="true"' : '') + '><div class="choice__inner">' + img + skuHtml + '<span class="choice__text' + statusClass + '">' + d.label + '</span>' + expTag + '</div></div>');
               },
               choice: function(classNames, d) {
                 var img = '';
@@ -1063,17 +1180,30 @@
                 var sku = (d.customProperties && d.customProperties.sku) || '';
                 var imgName = (d.customProperties && d.customProperties.image) || '';
                 if (imgName) img = '<img class="choice__img" src="<?= BASE_URL ?>/uploads/' + imgName + '" alt="" width="28" height="28" decoding="async" loading="lazy" fetchpriority="low">';
-                var statusClass = status ? (' stock-' + status) : '';
+                var statusClass = '';
+                var isExpired = false;
+                try {
+                  var cp = d.customProperties || {};
+                  var stv = parseInt(cp.stock||'0',10) || 0;
+                  isExpired = (status === 'expired') || String(cp.expired||'0') === '1';
+                  var color = cp.color_class || (isExpired ? 'stock-expired' : (stv <= 20 ? 'stock-low' : (stv <= 50 ? 'stock-warn' : 'stock-ok')));
+                  statusClass = ' ' + color;
+                  if ((cp.status||status) === 'exp_warn') statusClass += ' exp-warn';
+                } catch(_){ }
                 var skuHtml = sku ? ('<span class="choice__sku">' + sku + ' ·</span>') : '';
                 var ns = (d.customProperties && String(d.customProperties.no_stock||'0') === '1');
                 var extraCls = ns ? ' no-stock' : '';
-                var extraAttr = ns ? ' data-no-stock="1"' : '';
-                return template('<div class="' + classNames.item + ' ' + classNames.itemChoice + ' ' + (d.disabled ? classNames.itemDisabled : classNames.itemSelectable) + extraCls + '" data-select-text="" data-choice ' + (d.disabled ? 'data-choice-disabled aria-disabled="true"' : 'data-choice-selectable') + ' data-id="' + d.id + '" data-value="' + d.value + '" ' + (d.groupId > 0 ? 'role="treeitem"' : 'role="option"') + extraAttr + '><div class="choice__inner">' + img + skuHtml + '<span class="choice__text' + statusClass + '">' + d.label + '</span></div></div>');
+                var extraAttr = '';
+                if (ns) extraAttr += ' data-no-stock="1"';
+                if (isExpired) extraAttr += ' data-expired="1"';
+                var expTag2 = isExpired ? '<span class="choice__tag tag-expired">Vencido</span>' : '';
+                return template('<div class="' + classNames.item + ' ' + classNames.itemChoice + ' ' + (d.disabled ? classNames.itemDisabled : classNames.itemSelectable) + extraCls + '" data-select-text="" data-choice ' + (d.disabled ? 'data-choice-disabled aria-disabled="true"' : 'data-choice-selectable') + ' data-id="' + d.id + '" data-value="' + d.value + '" ' + (d.groupId > 0 ? 'role="treeitem"' : 'role="option"') + extraAttr + '><div class="choice__inner">' + img + skuHtml + '<span class="choice__text' + statusClass + '">' + d.label + '</span>' + expTag2 + '</div></div>');
               }
             };
           }
         });
-        __allChoices = all.slice();
+        // Remove nulls (e.g., placeholder option without value)
+        __allChoices = (all || []).filter(Boolean);
         // Ensure our listener still fires
         sel.addEventListener('change', updatePickerFromSelection);
         // Intercept click on zero-stock choices to prevent selection and show 4s toast
@@ -1084,6 +1214,11 @@
             if (el) {
               ev.preventDefault(); ev.stopPropagation();
               centerToast4('error','Sin stock','Este producto no tiene stock.');
+            }
+            var el2 = ev.target && ev.target.closest('.choices__item[data-choice][data-expired="1"]');
+            if (el2) {
+              ev.preventDefault(); ev.stopPropagation();
+              centerToast4('error','Producto vencido','No puedes seleccionar este producto.');
             }
           }, true);
         }
@@ -1098,6 +1233,14 @@
               if (typeof __choicesInst.setChoiceByValue === 'function') __choicesInst.setChoiceByValue('');
               sel.value = '';
               centerToast4('error','Sin stock','Este producto no tiene stock.');
+            }
+            var isExp = cp && (String(cp.expired||'0') === '1' || String(cp.status||'') === 'expired');
+            if (isExp) {
+              if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
+              if (typeof __choicesInst.removeActiveItems === 'function') __choicesInst.removeActiveItems();
+              if (typeof __choicesInst.setChoiceByValue === 'function') __choicesInst.setChoiceByValue('');
+              sel.value = '';
+              centerToast4('error','Producto vencido','No puedes seleccionar este producto.');
             }
           } catch(_){ }
         });
@@ -1123,34 +1266,78 @@
       } catch(_){ }
     }
     // Category filter -> filter choices
-    function applyCategoryFilter(){
-      if (!__choicesInst) return;
-      var val = (catSel && catSel.value) || '';
-      var filtered = __allChoices;
-      if (val && val !== 'all') {
-        filtered = __allChoices.filter(function(ch){ return ch && ch.customProperties && String(ch.customProperties.category_id||'') === String(val); });
-      }
+    function __rebuildAllChoicesFromNative(){
       try {
-        // 1) Remove any active items FIRST so they don't render above the list
-        if (typeof __choicesInst.removeActiveItems === 'function') { __choicesInst.removeActiveItems(); }
-        // 2) Clear internal store if available (defensive)
-        if (typeof __choicesInst.clearStore === 'function') { __choicesInst.clearStore(); }
-        // 3) Clear current choices and rebuild from filtered set
-        __choicesInst.clearChoices();
-        var filteredUnselected = filtered.map(function(ch){ ch.selected = false; return ch; });
-        __choicesInst.setChoices(filteredUnselected, 'value', 'label', true);
-        // 4) Ensure the native select has no value
-        sel.value = '';
-        updatePickerFromSelection();
-        // Clear search input in Choices; keep dropdown closed until the user clicks it
-        if (typeof __choicesInst.clearInput === 'function') { __choicesInst.clearInput(); }
+        var arr = Array.prototype.map.call(sel.options, function(o){
+          if (!o || !o.value) return null;
+          var stRaw = o.getAttribute('data-stock') || '';
+          var stNum = parseInt(stRaw||'0',10) || 0;
+          var stWarn = (stNum > 20 && stNum <= 50);
+          var stLow = (stNum <= 20);
+          var isExpired = (o.getAttribute('data-expired') === '1') || (o.getAttribute('data-status') === 'expired');
+          return {
+            value: o.value,
+            label: o.textContent,
+            disabled: (o.disabled || isExpired),
+            selected: false,
+            customProperties: {
+              image: o.getAttribute('data-image') || '',
+              status: o.getAttribute('data-status') || 'ok',
+              sku: o.getAttribute('data-sku') || '',
+              price: o.getAttribute('data-price') || '0',
+              stock: stRaw,
+              name: o.getAttribute('data-name') || o.textContent.trim(),
+              description: o.getAttribute('data-description') || '',
+              category_id: o.getAttribute('data-category-id') || '',
+              category_name: o.getAttribute('data-category-name') || '',
+              supplier_id: o.getAttribute('data-supplier-id') || '',
+              supplier_name: o.getAttribute('data-supplier-name') || '',
+              no_stock: (stNum <= 0) ? '1' : '0',
+              expired: isExpired ? '1' : '0',
+              color_class: (isExpired ? 'stock-expired' : (stLow ? 'stock-low' : (stWarn ? 'stock-warn' : 'stock-ok')))
+            }
+          };
+        }).filter(Boolean);
+        __allChoices = arr;
       } catch(_){ }
     }
-    if (catSel) {
-      catSel.addEventListener('change', applyCategoryFilter);
-      // Initialize with 'all'
-      applyCategoryFilter();
+    function applyCategoryFilter(){
+      if (!__choicesInst) return;
+      // Only filter when a specific category is selected; by default show all
+      var val = (catSel && (catSel.value || catSel.getAttribute('data-value') || '')) || '';
+      var vlow = String(val || '').trim().toLowerCase();
+      if (vlow === 'todas') val = 'all';
+      if (!__allChoices || !__allChoices.length) { __rebuildAllChoicesFromNative(); }
+      var filtered;
+      if (!val || val === 'all') {
+        filtered = __allChoices.slice();
+      } else {
+        filtered = __allChoices.filter(function(ch){ return ch && ch.customProperties && String(ch.customProperties.category_id||'') === String(val); });
+      }
+      // Fallback: if filter produced 0, show all to avoid empty state
+      if (!filtered || !filtered.length) { filtered = __allChoices.slice(); }
+      try {
+        if (typeof __choicesInst.removeActiveItems === 'function') { __choicesInst.removeActiveItems(); }
+        if (typeof __choicesInst.clearStore === 'function') { __choicesInst.clearStore(); }
+        __choicesInst.clearChoices();
+        var filteredUnselected = (filtered || []).filter(Boolean).map(function(ch){ ch.selected = false; return ch; });
+        // If still empty for any reason, repopulate with all
+        if (!filteredUnselected.length) {
+          filteredUnselected = (__allChoices || []).slice();
+        }
+        __choicesInst.setChoices(filteredUnselected, 'value', 'label', true);
+        // Keep placeholder visible
+        try { if (typeof __choicesInst.setChoiceByValue === 'function') __choicesInst.setChoiceByValue(''); } catch(_){ }
+      } catch(_){ }
     }
+    // Bind category changes to re-apply filter; also run once on load
+    if (catSel) {
+      try { catSel.addEventListener('change', applyCategoryFilter); } catch(_){ }
+      // Choices for category may fire custom events; ensure native change bubbles
+      try { catSel.addEventListener('addItem', applyCategoryFilter); } catch(_){ }
+    }
+    // Ensure initial population shows all choices by default
+    try { applyCategoryFilter(); } catch(_){ }
     // Initialize preview & price on page load for current selection
     updatePickerFromSelection();
     // Watcher: si otro componente (carrito flotante) limpia el borrador en localStorage, reflejarlo aquí sin recargar
@@ -1159,6 +1346,8 @@
       try { lastDraft = localStorage.getItem(DRAFT_KEY); } catch(_){ }
       setInterval(function(){
         try {
+          // If we are in the middle of a submission, do not react to draft changes
+          if (typeof __salesSubmitting !== 'undefined' && __salesSubmitting) { return; }
           var cur = localStorage.getItem(DRAFT_KEY);
           if (lastDraft && !cur) {
             // Borrador fue limpiado externamente
@@ -1215,8 +1404,9 @@
         centerNotify('warning','Aviso','Agrega al menos un producto');
         return;
       }
-      // Dejar que el backend haga la validación de stock
-      clearDraft();
+      // Marcamos que estamos enviando para que los watchers no vacíen el carrito
+      __salesSubmitting = true;
+      // No limpiar el borrador aquí; se limpiará después según el flujo (éxito o acciones del usuario)
     });
 
     // Initialize submit state on load
@@ -1252,11 +1442,43 @@
     (function(){
       var sd = document.getElementById('btnSaveDraft');
       if (!sd) return;
-      sd.addEventListener('click', function(){
+      sd.addEventListener('click', function(e){
+        try { if (e) { e.preventDefault(); e.stopPropagation(); } } catch(_){ }
         if (!body.querySelector('tr')) { return centerNotify('info','Sin artículos','Agrega productos antes de guardar borrador.'); }
         saveDraft();
         centerNotify('success','Borrador guardado','Tu carrito fue guardado.');
       });
+    })();
+
+    // Clear cart with confirm (avoid any submit)
+    (function(){
+      var cc = document.getElementById('btnClearCart');
+      if (!cc) return;
+      cc.addEventListener('click', function(e){
+        try { if (e) { e.preventDefault(); e.stopPropagation(); } } catch(_){ }
+        if (!body.querySelector('tr')) { return centerNotify('info','Carrito vacío','No hay productos para eliminar.'); }
+        confirmPretty({ title:'Vaciar carrito', text:'¿Deseas eliminar todos los productos del carrito?', ok:'Sí, vaciar', cancel:'Cancelar', icon:'warning' }).then(function(ok){
+          if (!ok) return;
+          try { body.innerHTML = ''; resequence(); recalc(); clearDraft(); } catch(_){ }
+          centerNotify('success','Carrito vaciado','Se eliminaron todos los productos.');
+        });
+      });
+    })();
+
+    // Safe navigate buttons inside form (avoid accidental submit)
+    (function(){
+      function safeNav(anchor){
+        if (!anchor) return;
+        anchor.addEventListener('click', function(e){
+          try { if (e) { e.preventDefault(); e.stopPropagation(); } } catch(_){ }
+          var href = anchor.getAttribute('href') || '#';
+          if (!href || href === '#') return;
+          // No loaders or confirms; direct navigation
+          window.location.href = href;
+        });
+      }
+      safeNav(document.getElementById('btnBackToProducts'));
+      safeNav(document.getElementById('btnCancelSale'));
     })();
 
     // Draft banner actions

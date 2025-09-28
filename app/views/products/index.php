@@ -296,11 +296,12 @@
       <thead><tr><th>#</th><th>SKU</th><th>Nombre</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Caducidad</th><th>Estado</th><th>Acciones</th></tr></thead>
       <tbody>
         <?php
-          $now = time();
-          $soonCount = 0; // 1-30 días
-          $midCount = 0;  // 31-60 días
+          // Use date-only comparison to avoid off-by-one from time-of-day
+          $today = new \DateTimeImmutable('today');
+          $soonCount = 0; // 1-31 días
+          $midCount = 0;  // 32-60 días
           $okCount  = 0;  // 61+
-          $expiredCount = 0; // < 0 días
+          $expiredCount = 0; // dd <= 0
           $lowStockCount = 0;
           $thr = defined('LOW_STOCK_THRESHOLD') ? (int)LOW_STOCK_THRESHOLD : 5;
           $STOCK_DANGER = defined('STOCK_DANGER') ? (int)STOCK_DANGER : 20;
@@ -310,16 +311,18 @@
           <?php
             $stock = (int)($p['stock'] ?? 0);
             if ($stock > 0 && $stock <= $thr) { $lowStockCount++; }
-            $days = null;
+            $days = null; // dd = days until expiry (date-based), 0=today, <0=expired
             if (!empty($p['expires_at'])) {
-              $ts = strtotime($p['expires_at']);
-              if ($ts !== false) {
-                $days = (int)floor(($ts - $now) / 86400);
-                if ($days < 0) { $expiredCount++; /* expirado */ }
-                elseif ($days <= 30) $soonCount++;
-                elseif ($days <= 60) $midCount++;
-                else $okCount++;
-              }
+              try {
+                $expDate = new \DateTimeImmutable((string)$p['expires_at']);
+                $diff = (int)$today->diff($expDate)->format('%r%a');
+                // Note: positive means in future, 0 today, negative past
+                $days = $diff;
+                if ($days <= 0) { $expiredCount++; }
+                elseif ($days <= 31) { $soonCount++; }
+                elseif ($days <= 60) { $midCount++; }
+                else { $okCount++; }
+              } catch (\Throwable $_) { $days = null; }
             }
             // Color del badge SOLO por stock, usando umbrales configurables
             if ($stock <= $STOCK_DANGER) {
@@ -331,11 +334,11 @@
             }
             // Ícono para bajo stock
             $badgeIconHtml = ($stock <= $STOCK_DANGER) ? '<i class="fas fa-exclamation-circle mr-1" aria-hidden="true"></i>' : '';
-            // Resaltar fila por caducidad: expirado en rojo, <=30 días en amarillo
+            // Resaltar fila por caducidad: expirado en rojo, ≤31 días en amarillo
             $rowClass = '';
             if ($days !== null) {
-              if ($days < 0) { $rowClass = 'table-danger'; }
-              elseif ($days <= 30) { $rowClass = 'table-warning'; }
+              if ($days <= 0) { $rowClass = 'table-danger'; }
+              elseif ($days <= 31) { $rowClass = 'table-warning'; }
             }
           ?>
           <tr class="<?= $rowClass ?>" data-days="<?= $days === null ? '' : $days ?>">
@@ -359,10 +362,16 @@
               <?php if ($days === null): ?>
                 —
               <?php else: ?>
-                <?php if ($days < 0): ?>
-                  <span class="badge badge-danger" title="Producto vencido"><?= View::e($p['expires_at']) ?> (Vencido, −<?= abs($days) ?> d)</span>
-                <?php elseif ($days <= 30): ?>
-                  <span class="badge badge-warning" title="Por vencer"><?= View::e($p['expires_at']) ?> (Advertencia, <?= $days ?> d)</span>
+                <?php if ($days <= 0): ?>
+                  <?php if ($days === 0): ?>
+                    <span class="badge badge-danger" title="Producto vence hoy"><?= View::e($p['expires_at']) ?> (Venció hoy)</span>
+                  <?php else: ?>
+                    <?php $absd = abs($days); $dlabel = ($absd === 1 ? 'día' : 'días'); ?>
+                    <span class="badge badge-danger" title="Producto vencido"><?= View::e($p['expires_at']) ?> (Venció hace <?= $absd ?> <?= $dlabel ?>)</span>
+                  <?php endif; ?>
+                <?php elseif ($days <= 31): ?>
+                  <?php $dlabel = ($days === 1 ? 'día' : 'días'); ?>
+                  <span class="badge badge-warning" title="Por vencer"><?= View::e($p['expires_at']) ?> (Faltan <?= $days ?> <?= $dlabel ?>)</span>
                 <?php else: ?>
                   <span class="badge badge-primary" title="Fecha válida">
                     <?= View::e($p['expires_at']) ?> (<?= $days ?> d)
@@ -384,6 +393,7 @@
                       data-id="<?= (int)$p['id'] ?>"
                       data-sku="<?= View::e($p['sku'] ?? '') ?>"
                       data-name="<?= View::e($p['name'] ?? '') ?>"
+                      data-expdays="<?= ($days === null ? '' : (int)$days) ?>"
                       data-description="<?= View::e($p['description'] ?? '') ?>"
                       data-stock="<?= View::e($p['stock'] ?? 0) ?>"
                       data-price="<?= number_format((float)($p['price'] ?? 0), 2, '.', '') ?>"
@@ -463,15 +473,15 @@
             var name = (nameEl && nameEl.textContent) ? nameEl.textContent.trim() : '';
             if (!name) return;
             if (!isNaN(days)) {
-              if (days < 0) expired.push(name);
-              else if (days <= 30) soon.push(name);
+              if (days <= 0) expired.push(name);
+              else if (days <= 31) soon.push(name);
             }
           } catch(_){ }
         });
         if (expired.length || soon.length) {
           var parts = [];
-          if (expired.length) parts.push('<div><span class="badge badge-danger mr-1">Vencidos: '+expired.length+'</span> '+expired.slice(0,10).join(', ')+(expired.length>10?'…':'')+'</div>');
-          if (soon.length) parts.push('<div><span class="badge badge-warning mr-1">Por vencer (≤30d): '+soon.length+'</span> '+soon.slice(0,10).join(', ')+(soon.length>10?'…':'')+'</div>');
+          if (expired.length) parts.push('<div><span class="badge badge-danger mr-1">Vencidos (incluye hoy): '+expired.length+'</span> '+expired.slice(0,10).join(', ')+(expired.length>10?'…':'')+'</div>');
+          if (soon.length) parts.push('<div><span class="badge badge-warning mr-1">Por vencer (≤31d): '+soon.length+'</span> '+soon.slice(0,10).join(', ')+(soon.length>10?'…':'')+'</div>');
           var html = parts.join('');
           if (window.notify) {
             window.notify({ icon: 'info', title: 'Alertas de vencimiento', html: html, timeout: 8000 });
@@ -802,10 +812,23 @@
         var sd = parseInt(btn.getAttribute('data-stkdanger')||'20',10) || 20;
         var swCfg = parseInt(btn.getAttribute('data-stkwarn')||'60',10) || 60;
         var sw = Math.max(sd, swCfg); // warning hasta STOCK_WARN (por defecto 60)
-        var days = null;
-        if (exp) {
-          var ts = Date.parse(exp);
-          if (!isNaN(ts)) { days = Math.floor((ts - Date.now()) / 86400000); }
+        // Prefer server-computed days (exactly what the table uses) if available
+        var btnDaysAttr = btn.getAttribute('data-expdays');
+        var days = (btnDaysAttr !== null && btnDaysAttr !== '' && !isNaN(parseInt(btnDaysAttr,10))) ? parseInt(btnDaysAttr,10) : null;
+        if (days === null && exp) {
+          // Compute days until expiry using LOCAL date-only and round to avoid off-by-one in some environments
+          (function(){
+            try {
+              var m = /^([0-9]{4})-([0-9]{2})-([0-9]{2})/.exec(exp);
+              if (m) {
+                var y = parseInt(m[1],10), mo = parseInt(m[2],10)-1, d = parseInt(m[3],10);
+                var expLocal = new Date(y, mo, d); // local midnight of expiry
+                var now = new Date();
+                var todayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // local midnight today
+                days = Math.round((expLocal - todayLocal) / 86400000);
+              }
+            } catch(_){ /* keep days as null on parse error */ }
+          })();
         }
         // Nivel de stock y de caducidad (se toma el peor para el tema del modal)
         var levelStock = 'success';
@@ -815,7 +838,7 @@
         var levelExp = 'success';
         if (typeof days === 'number') {
           if (days < 0) levelExp = 'danger';
-          else if (days <= 30) levelExp = 'warning';
+          else if (days <= 31) levelExp = 'warning';
         }
         var level = (levelStock === 'danger' || levelExp === 'danger') ? 'danger'
                   : ((levelStock === 'warning' || levelExp === 'warning') ? 'warning' : 'success');
@@ -840,10 +863,16 @@
           if (typeof days === 'number') {
             if (days < 0) {
               expEl.classList.add('badge','badge-danger');
-              expEl.textContent = (exp || '') + ' (Vencido, −' + Math.abs(days) + ' d)';
-            } else if (days <= 30) {
+              var absd = Math.abs(days);
+              var dl = (absd === 1 ? 'día' : 'días');
+              expEl.textContent = (exp || '') + ' (Venció hace ' + absd + ' ' + dl + ')';
+            } else if (days === 0) {
+              expEl.classList.add('badge','badge-danger');
+              expEl.textContent = (exp || '') + ' (Venció hoy)';
+            } else if (days <= 31) {
               expEl.classList.add('badge','badge-warning');
-              expEl.textContent = (exp || '') + ' (Advertencia, ' + days + ' d)';
+              var dl2 = (days === 1 ? 'día' : 'días');
+              expEl.textContent = (exp || '') + ' (Faltan ' + days + ' ' + dl2 + ')';
             } else {
               // OK: azulito con días
               expEl.classList.add('badge','badge-primary');
@@ -1112,7 +1141,7 @@
           var days = d === '' || d === null ? null : parseInt(d,10);
           var show = true;
           if (val === '30') {
-            show = days !== null && days <= 30;
+            show = days !== null && days <= 31;
           } else if (val === '60') {
             show = days !== null && days <= 60;
           } else {

@@ -8,7 +8,10 @@
       </h3>
       <div class="btn-toolbar mb-0" role="toolbar" aria-label="Toolbar ventas">
         <div class="btn-group mr-2 mb-2" role="group" aria-label="Accesos rápidos">
-          <a href="<?= BASE_URL ?>/sales" class="btn btn-link btn-sm"><i class="fas fa-calendar-day mr-1" aria-hidden="true"></i> Ventas del día</a>
+          <a href="<?= BASE_URL ?>/sales" class="btn btn-primary btn-sm ps-btn-back">
+            <i class="fas fa-arrow-left mr-1" aria-hidden="true"></i>
+            Ventas del día
+          </a>
         </div>
         <form class="form-inline mr-2 mb-2" method="get" action="<?= BASE_URL ?>/sales/all" role="search" aria-label="Buscar por ID">
           <div class="input-group input-group-sm">
@@ -31,16 +34,26 @@
           <button type="button" id="btnAllSalesToday" class="btn btn-outline-secondary btn-sm mr-1" title="Hoy"><i class="fas fa-calendar-day mr-1" aria-hidden="true"></i> Hoy</button>
           <button type="button" id="btnAllSalesClear" class="btn btn-outline-secondary btn-sm" title="Limpiar filtros"><i class="fas fa-eraser mr-1" aria-hidden="true"></i> Limpiar</button>
         </form>
-        <!-- Exportar Excel (usa el rango del filtro de arriba) -->
-        <div class="form-inline mb-2" aria-label="Exportar Excel">
-          <div class="custom-control custom-checkbox mr-2">
-            <input class="custom-control-input" type="checkbox" id="expAll" value="1">
-            <label class="custom-control-label" for="expAll">Todas</label>
+        <!-- Exportar Excel: enlaces directos (solo Administrador) -->
+        <?php $canExport = \App\Helpers\Auth::isAdmin(); ?>
+        <?php if ($canExport): ?>
+          <div class="form-inline mb-2" aria-label="Exportar Excel">
+            <?php
+              $expUrl = BASE_URL . '/sales/export';
+              $qs = [];
+              if (!empty($_GET['from'])) $qs['from'] = $_GET['from'];
+              if (!empty($_GET['to'])) $qs['to'] = $_GET['to'];
+              $expUrlWithFilters = $expUrl . (empty($qs) ? '' : ('?' . http_build_query($qs)));
+              $expUrlAll = $expUrl . '?all=1';
+            ?>
+            <a href="<?= View::e($expUrlWithFilters) ?>" class="btn btn-success btn-sm mr-2" title="Exportar a Excel (con filtros)" download data-no-loader>
+              <i class="fas fa-file-excel mr-1" aria-hidden="true"></i> Exportar (filtros)
+            </a>
+            <a href="<?= View::e($expUrlAll) ?>" class="btn btn-outline-success btn-sm" title="Exportar todas a Excel" download data-no-loader>
+              <i class="fas fa-file-excel mr-1" aria-hidden="true"></i> Exportar todas
+            </a>
           </div>
-          <a href="#" id="btnAllSalesExport" class="btn btn-success btn-sm" title="Exportar a Excel">
-            <i class="fas fa-file-excel mr-1" aria-hidden="true"></i> Exportar Excel
-          </a>
-        </div>
+        <?php endif; ?>
         <div class="btn-group ml-2 mb-2" role="group">
           <a href="<?= BASE_URL ?>/sales/create" class="btn btn-primary btn-sm"><i class="fas fa-plus mr-1" aria-hidden="true"></i> Nueva venta</a>
         </div>
@@ -73,6 +86,73 @@
           if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showEmptyAllSales);
           else showEmptyAllSales();
         })();
+  // Modal Ver venta: similar a Movements (con fallback sin Bootstrap)
+  (function(){
+    function show(el, on){ if (!el) return; el.style.display = on ? '' : 'none'; }
+    function setText(id, t){ var el = document.getElementById(id); if (el) el.textContent = t || ''; }
+    function formatMoney(n){ try { return new Intl.NumberFormat('es-CL', { style:'currency', currency:'CLP', maximumFractionDigits:0 }).format(n||0); } catch(_){ return '$' + String(n||0); } }
+    function openModalById(id){
+      if (window.jQuery && typeof jQuery.fn.modal === 'function') { jQuery('#'+id).modal('show'); return; }
+      var el = document.getElementById(id); if (!el) return;
+      el.classList.add('show'); el.style.display='block'; el.removeAttribute('aria-hidden'); el.setAttribute('aria-modal','true');
+      var bd = document.createElement('div'); bd.className='modal-backdrop fade show'; bd.id=id+'__backdrop'; document.body.appendChild(bd);
+      el.querySelectorAll('[data-dismiss="modal"], .close').forEach(function(btn){ btn.addEventListener('click', function(){ closeModalById(id); }, {once:true}); });
+    }
+    function closeModalById(id){
+      var el = document.getElementById(id); if (!el) return;
+      el.classList.remove('show'); el.style.display='none'; el.setAttribute('aria-hidden','true'); el.removeAttribute('aria-modal');
+      var bd = document.getElementById(id+'__backdrop'); if (bd) bd.parentNode.removeChild(bd);
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      var tbody = document.querySelector('.table.table-striped tbody');
+      if (!tbody) return;
+      tbody.addEventListener('click', function(e){
+        var btn = e.target.closest('.ps-view-sale');
+        if (!btn) return;
+        var id = parseInt(btn.getAttribute('data-id')||'0',10); if (!id) return;
+        var loading = document.getElementById('psSaleLoading');
+        var err = document.getElementById('psSaleError');
+        var content = document.getElementById('psSaleContent');
+        show(loading, true); show(err, false); show(content, false);
+        openModalById('psSaleModal');
+        fetch((window.BASE_URL||'<?= rtrim(BASE_URL,'/') ?>') + '/sales/show/' + id, { headers: { 'Accept':'application/json' }})
+          .then(function(r){ if (!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+          .then(function(data){
+            show(loading, false);
+            if (!data || !data.ok){ err.textContent = (data && data.message) ? data.message : 'No se pudo cargar la venta.'; show(err,true); return; }
+            var s = data.sale || {};
+            setText('psSaleId', '#' + String(s.id||id));
+            setText('psSaleDate', s.created_at || '');
+            var cust = (s.customer_name||'') || 'N/D'; setText('psSaleCustomer', cust);
+            var contact = []; if (s.customer_phone) contact.push(s.customer_phone); if (s.customer_email) contact.push(s.customer_email);
+            setText('psSaleContact', contact.join(' · '));
+            var attended = ((s.user_name||'') + (s.user_role?(' ('+s.user_role+')'):'')).trim(); setText('psSaleUser', attended);
+            var items = Array.isArray(s.items) ? s.items : [];
+            var tbodyItems = document.getElementById('psSaleItems'); if (tbodyItems) tbodyItems.innerHTML = '';
+            var total = 0;
+            items.forEach(function(it, idx){
+              var qty = parseInt(it.qty||0,10) || 0;
+              var up = parseInt(it.unit_price||0,10) || 0;
+              var sub = qty*up; total += sub;
+              var tr = document.createElement('tr');
+              tr.innerHTML = '<td class=\"text-muted\">'+ (idx+1) +'</td>'+
+                             '<td>'+ (it.sku?String(it.sku).replace(/</g,'&lt;'):'') +'</td>'+
+                             '<td>'+ (it.name?String(it.name).replace(/</g,'&lt;'):'') +'</td>'+
+                             '<td class=\"text-right mono\">'+ qty +'</td>'+
+                             '<td class=\"text-right mono\">'+ formatMoney(up) +'</td>'+
+                             '<td class=\"text-right mono\">'+ formatMoney(sub) +'</td>';
+              if (tbodyItems) tbodyItems.appendChild(tr);
+            });
+            setText('psSaleItemsCount', String(items.length));
+            setText('psSaleTotal', formatMoney(total));
+            var foot = document.getElementById('psSaleTotalFoot'); if (foot) foot.textContent = formatMoney(total);
+            var inv = document.getElementById('psSaleInvoiceLink'); if (inv) inv.href = (window.BASE_URL||'<?= rtrim(BASE_URL,'/') ?>') + '/sales/invoice/' + (s.id||id);
+            show(content, true);
+          })
+          .catch(function(e){ show(loading,false); err.textContent = 'Error al cargar: ' + e.message; show(err,true); });
+      }, false);
+    });
+  })();
       </script>
     <?php else: ?>
     <table class="table table-striped mb-0">
@@ -109,6 +189,9 @@
             <td><?= View::e($attended) ?></td>
             <td><?= View::e($s['created_at']) ?></td>
             <td>
+              <button type="button" class="btn btn-sm ps-btn-view mr-1 ps-view-sale" data-id="<?= (int)$s['id'] ?>">
+                <i class="fas fa-eye mr-1" aria-hidden="true"></i> Ver venta
+              </button>
               <a class="btn btn-sm btn-outline-primary mr-1" target="_blank" href="<?= BASE_URL ?>/sales/invoice/<?= View::e($s['id']) ?>">
                 <i class="fas fa-receipt mr-1" aria-hidden="true"></i> Ver detalles
               </a>
@@ -122,7 +205,92 @@
     </table>
     <?php endif; ?>
   </div>
-</div>
+  </div>
+
+<!-- Modal para ver detalle de Venta (Sales All) -->
+<style>
+  /* Botón verde gradiente para acciones "Ver …" */
+  .ps-btn-view { background: linear-gradient(135deg, #2ecc71, #27ae60); color:#fff; border:0; }
+  .ps-btn-view:hover, .ps-btn-view:focus { color:#fff; filter: brightness(0.95); }
+  
+  /* Scoped styles for the Sale Modal */
+  #psSaleModal .modal-header {
+    background: linear-gradient(135deg, #0d6efd, #6610f2);
+    color: #fff;
+  }
+  #psSaleModal .modal-title { font-weight: 600; }
+  .ps-chip { display:inline-flex; align-items:center; padding:2px 8px; border-radius:999px; font-size:12px; background:#f1f3f5; color:#495057; margin-right:6px; }
+  .ps-chip .ico { margin-right:6px; opacity:.8; }
+  .ps-summary { display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 10px; }
+  .ps-summary .ps-chip.total { background:#e7f5ff; color:#0b7285; }
+  .ps-summary .ps-chip.items { background:#fff4e6; color:#d9480f; }
+  #psSaleModal .table thead th { background:#f8f9fa; border-top:0; }
+  #psSaleModal .table tfoot th { background:#f8f9fa; }
+  #psSaleModal .muted { color:#6c757d; }
+  #psSaleModal .section-title { font-size:14px; font-weight:600; color:#495057; margin:8px 0 6px; text-transform:uppercase; letter-spacing:.02em; }
+  #psSaleModal .kv { font-size: 13px; }
+  #psSaleModal .kv strong { color:#343a40; }
+  #psSaleModal .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  #psSaleModal .badge-soft { background:#f1f3f5; color:#495057; }
+  #psSaleModal .divider { height:1px; background:#e9ecef; margin:8px 0; }
+</style>
+<style>
+  /* Botón de regreso más visible */
+  .ps-btn-back { box-shadow: 0 2px 6px rgba(0,0,0,.08); border-radius: 6px; }
+  .ps-btn-back i { opacity: .9; }
+</style>
+<div class="modal fade" id="psSaleModal" tabindex="-1" role="dialog" aria-labelledby="psSaleModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="psSaleModalLabel">
+          <i class="fas fa-shopping-bag mr-2" aria-hidden="true"></i>
+          Detalle de venta <span class="badge badge-light ml-2 mono" id="psSaleId"></span>
+        </h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="psSaleLoading" class="text-center my-3" style="display:none"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>
+        <div id="psSaleError" class="alert alert-danger" style="display:none"></div>
+        <div id="psSaleContent" style="display:none">
+          <div class="d-flex align-items-center justify-content-between flex-wrap">
+            <div class="kv mb-1"><span class="muted">Fecha:</span> <strong id="psSaleDate"></strong></div>
+            <div class="ps-summary">
+              <span class="ps-chip items"><span class="ico"><i class="fas fa-list-ol"></i></span>Items: <span class="mono ml-1" id="psSaleItemsCount">0</span></span>
+              <span class="ps-chip total"><span class="ico"><i class="fas fa-dollar-sign"></i></span>Total: <span class="mono ml-1" id="psSaleTotal"></span></span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="section-title">Cliente</div>
+              <div class="kv"><strong id="psSaleCustomer"></strong></div>
+              <div class="kv"><span class="muted">Contacto:</span> <span id="psSaleContact"></span></div>
+            </div>
+            <div class="col-md-6">
+              <div class="section-title">Atendido por</div>
+              <div class="kv"><strong id="psSaleUser"></strong></div>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div class="section-title">Productos</div>
+          <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0">
+              <thead><tr><th>#</th><th>SKU</th><th>Producto</th><th class="text-right">Cant.</th><th class="text-right">P. Unit</th><th class="text-right">Subtotal</th></tr></thead>
+              <tbody id="psSaleItems"></tbody>
+              <tfoot><tr><th colspan="5" class="text-right">Total</th><th class="text-right mono" id="psSaleTotalFoot"></th></tr></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a id="psSaleInvoiceLink" target="_blank" class="btn btn-primary" href="#"><i class="fas fa-file-invoice mr-1"></i> Ver factura</a>
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+  </div>
 
 <?php if (!empty($pagination) && is_array($pagination)): ?>
   <?php
@@ -154,65 +322,6 @@
 <?php endif; ?>
 
 <script>
-  // Export: usa fechas del filtro y "Todas" si está marcado; descarga por iframe (sin overlay) + spinner rápido en botón
-  (function(){
-    function buildExportUrl(){
-      var url = '<?= BASE_URL ?>/sales/export';
-      try {
-        var filterForm = document.querySelector('form[action$="/sales/all"][aria-label="Filtrar por fecha"]');
-        var from = filterForm ? (filterForm.querySelector('input[name="from"]').value || '') : '';
-        var to = filterForm ? (filterForm.querySelector('input[name="to"]').value || '') : '';
-        var all = document.getElementById('expAll');
-        var p = [];
-        if (all && all.checked) { p.push('all=1'); }
-        else {
-          if (from) p.push('from=' + encodeURIComponent(from));
-          if (to) p.push('to=' + encodeURIComponent(to));
-        }
-        if (p.length) url += '?' + p.join('&');
-      } catch(_){ }
-      return url;
-    }
-    function setBtnLoading(btn, isLoading){
-      if (!btn) return;
-      if (isLoading) {
-        if (!btn._origHtml) btn._origHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.classList.add('disabled');
-        var label = btn.getAttribute('data-loading') || 'Exportando…';
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm mr-1" role="status" aria-hidden="true"></span>' + label;
-      } else {
-        btn.disabled = false;
-        btn.classList.remove('disabled');
-        if (btn._origHtml) btn.innerHTML = btn._origHtml;
-      }
-    }
-    function startIframeDownload(href, anchor){
-      var iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.setAttribute('aria-hidden','true');
-      var restored = false;
-      function restore(){ if (restored) return; restored = true; setBtnLoading(anchor, false); }
-      var done = function(){ try { iframe.remove(); } catch(_){ } restore(); };
-      iframe.onload = done; iframe.onerror = done;
-      document.body.appendChild(iframe);
-      iframe.src = href;
-      setTimeout(restore, 1500);
-    }
-    document.addEventListener('DOMContentLoaded', function(){
-      var btn = document.getElementById('btnAllSalesExport');
-      if (btn) {
-        btn.setAttribute('data-loading','Exportando…');
-        btn.addEventListener('click', function(e){
-          e.preventDefault();
-          try {
-            setBtnLoading(btn, true);
-            startIframeDownload(buildExportUrl(), btn);
-          } catch(_){ setBtnLoading(btn, false); }
-        });
-      }
-    });
-  })();
   // Acciones rápidas: Hoy / Limpiar para el listado (todas)
   (function(){
     function fmt(n){ return (n < 10 ? '0' + n : '' + n); }
@@ -237,6 +346,76 @@
           try { inpFrom.value = ''; inpTo.value = ''; form.submit(); } catch(_){ }
         });
       }
+    });
+  })();
+</script>
+
+<script>
+  // Habilitar botón "Ver venta" SIEMPRE (para el listado con filas)
+  (function(){
+    function show(el, on){ if (!el) return; el.style.display = on ? '' : 'none'; }
+    function setText(id, t){ var el = document.getElementById(id); if (el) el.textContent = t || ''; }
+    function formatMoney(n){ try { return new Intl.NumberFormat('es-CL', { style:'currency', currency:'CLP', maximumFractionDigits:0 }).format(n||0); } catch(_){ return '$' + String(n||0); } }
+    function openModalById(id){
+      if (window.jQuery && typeof jQuery.fn.modal === 'function') { jQuery('#'+id).modal('show'); return; }
+      var el = document.getElementById(id); if (!el) return;
+      el.classList.add('show'); el.style.display='block'; el.removeAttribute('aria-hidden'); el.setAttribute('aria-modal','true');
+      var bd = document.createElement('div'); bd.className='modal-backdrop fade show'; bd.id=id+'__backdrop'; document.body.appendChild(bd);
+      el.querySelectorAll('[data-dismiss="modal"], .close').forEach(function(btn){ btn.addEventListener('click', function(){ closeModalById(id); }, {once:true}); });
+    }
+    function closeModalById(id){
+      var el = document.getElementById(id); if (!el) return;
+      el.classList.remove('show'); el.style.display='none'; el.setAttribute('aria-hidden','true'); el.removeAttribute('aria-modal');
+      var bd = document.getElementById(id+'__backdrop'); if (bd) bd.parentNode.removeChild(bd);
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      var tbody = document.querySelector('.table.table-striped tbody');
+      if (!tbody) return;
+      tbody.addEventListener('click', function(e){
+        var btn = e.target.closest('.ps-view-sale');
+        if (!btn) return;
+        var id = parseInt(btn.getAttribute('data-id')||'0',10); if (!id) return;
+        var loading = document.getElementById('psSaleLoading');
+        var err = document.getElementById('psSaleError');
+        var content = document.getElementById('psSaleContent');
+        show(loading, true); show(err, false); show(content, false);
+        openModalById('psSaleModal');
+        fetch((window.BASE_URL||'<?= rtrim(BASE_URL,'/') ?>') + '/sales/show/' + id, { headers: { 'Accept':'application/json' }})
+          .then(function(r){ if (!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+          .then(function(data){
+            show(loading, false);
+            if (!data || !data.ok){ err.textContent = (data && data.message) ? data.message : 'No se pudo cargar la venta.'; show(err,true); return; }
+            var s = data.sale || {};
+            setText('psSaleId', '#' + String(s.id||id));
+            setText('psSaleDate', s.created_at || '');
+            var cust = (s.customer_name||'') || 'N/D'; setText('psSaleCustomer', cust);
+            var contact = []; if (s.customer_phone) contact.push(s.customer_phone); if (s.customer_email) contact.push(s.customer_email);
+            setText('psSaleContact', contact.join(' · '));
+            var attended = ((s.user_name||'') + (s.user_role?(' ('+s.user_role+')'):'')).trim(); setText('psSaleUser', attended);
+            var items = Array.isArray(s.items) ? s.items : [];
+            var tbodyItems = document.getElementById('psSaleItems'); if (tbodyItems) tbodyItems.innerHTML = '';
+            var total = 0;
+            items.forEach(function(it, idx){
+              var qty = parseInt(it.qty||0,10) || 0;
+              var up = parseInt(it.unit_price||0,10) || 0;
+              var sub = qty*up; total += sub;
+              var tr = document.createElement('tr');
+              tr.innerHTML = '<td class="text-muted">'+ (idx+1) +'</td>'+
+                             '<td>'+ (it.sku?String(it.sku).replace(/</g,'&lt;'):'') +'</td>'+
+                             '<td>'+ (it.name?String(it.name).replace(/</g,'&lt;'):'') +'</td>'+
+                             '<td class="text-right mono">'+ qty +'</td>'+
+                             '<td class="text-right mono">'+ formatMoney(up) +'</td>'+
+                             '<td class="text-right mono">'+ formatMoney(sub) +'</td>';
+              if (tbodyItems) tbodyItems.appendChild(tr);
+            });
+            setText('psSaleItemsCount', String(items.length));
+            setText('psSaleTotal', formatMoney(total));
+            var foot = document.getElementById('psSaleTotalFoot'); if (foot) foot.textContent = formatMoney(total);
+            var inv = document.getElementById('psSaleInvoiceLink'); if (inv) inv.href = (window.BASE_URL||'<?= rtrim(BASE_URL,'/') ?>') + '/sales/invoice/' + (s.id||id);
+            show(content, true);
+          })
+          .catch(function(e){ show(loading,false); err.textContent = 'Error al cargar: ' + e.message; show(err,true); });
+      }, false);
     });
   })();
 </script>

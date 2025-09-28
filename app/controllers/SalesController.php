@@ -79,7 +79,7 @@ class SalesController extends Controller {
             'products' => $products,
             'categories' => $categories,
             'suppliers' => $suppliers,
-            'title' => 'Registrar venta'
+            'title' => 'Realizar venta'
         ]);
     }
 
@@ -155,7 +155,7 @@ class SalesController extends Controller {
                 $saleId = (new Sale())->create($productId, $qty, $unitPrice, $customerName, $customerPhone, $customerEmail);
             }
             // Flash success notification
-            Flash::success('Venta registrada exitosamente', 'Venta exitosa');
+            Flash::success('Venta realizada exitosamente', 'Venta exitosa');
             $this->redirect('/sales/invoice/' . $saleId);
         } catch (\Throwable $e) {
             $products = (new Product())->all();
@@ -166,7 +166,7 @@ class SalesController extends Controller {
                 'categories' => $categories,
                 'suppliers' => $suppliers,
                 'error' => $e->getMessage(),
-                'title' => 'Registrar venta'
+                'title' => 'Realizar venta'
             ]);
         }
     }
@@ -242,6 +242,8 @@ class SalesController extends Controller {
     /** Descargar Excel con ventas del rango from/to actual. */
     public function export(): void {
         if (!Auth::check()) { $this->redirect('/auth/login'); }
+        // Restrict export to administrators only
+        if (!Auth::isAdmin()) { http_response_code(403); exit('No autorizado'); }
         // Allow exporting all history with all=1
         $exportAll = isset($_GET['all']) && (string)$_GET['all'] === '1';
         $from = trim((string)($_GET['from'] ?? ''));
@@ -298,9 +300,13 @@ class SalesController extends Controller {
         foreach (range('A','K') as $col) { $sh->getColumnDimension($col)->setAutoSize(true); }
 
         $filename = $exportAll ? 'ventas_todas.xlsx' : ('ventas_' . $from . '_a_' . $to . '.xlsx');
+        // Clean output buffers to avoid corrupting the XLSX and ensure headers are sent properly
+        while (ob_get_level() > 0) { @ob_end_clean(); }
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Cache-Control: max-age=0');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('Expires: 0');
         $writer = new Xlsx($ss);
         $writer->save('php://output');
         exit;
@@ -316,11 +322,27 @@ class SalesController extends Controller {
         $sh->fromArray(['Juan Perez','3000000000','juan@example.com','ABC123',2,15000], null, 'A2');
         $sh->fromArray(['Ana Gomez','3011111111','', 'LMN456',3,12000], null, 'A3');
         foreach (range('A','F') as $col) { $sh->getColumnDimension($col)->setAutoSize(true); }
+        while (ob_get_level() > 0) { @ob_end_clean(); }
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Disposition: attachment; filename="plantilla_import_ventas.xlsx"');
-        header('Cache-Control: max-age=0');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('Expires: 0');
         $writer = new Xlsx($ss);
         $writer->save('php://output');
         exit;
+    }
+
+    /**
+     * Venta (cabecera + ítems) en JSON para modal en Movimientos.
+     */
+    public function show($id): void {
+        if (!Auth::check()) { $this->redirect('/auth/login'); }
+        if (!Auth::isAdmin()) { http_response_code(403); exit('No autorizado'); }
+        $id = (int)$id;
+        $sale = (new Sale())->findByIdWithItems($id);
+        header('Content-Type: application/json; charset=utf-8');
+        if (!$sale) { http_response_code(404); echo json_encode(['ok'=>false,'message'=>'Venta no encontrada']); return; }
+        echo json_encode(['ok'=>true, 'sale'=>$sale], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
     }
 }

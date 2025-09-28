@@ -74,6 +74,8 @@ $router->get('/products/retired', 'ProductsController@retired');
 $router->post('/products/reactivate/{id}', 'ProductsController@reactivate');
 // Toggle active->retired
 $router->post('/products/retire/{id}', 'ProductsController@retire');
+// Products JSON (for modals)
+$router->get('/products/show/{id}', 'ProductsController@show');
 
 // Notifications
 $router->get('/notifications/alerts', 'NotificationsController@alerts');
@@ -91,6 +93,12 @@ $router->post('/sales/store', 'SalesController@store');
 $router->get('/sales/invoice/{id}', 'SalesController@invoice');
 $router->get('/sales/export', 'SalesController@export');
 $router->get('/sales/template', 'SalesController@template');
+// Sales JSON (for modals)
+$router->get('/sales/show/{id}', 'SalesController@show');
+
+// Movements (audit logs)
+$router->get('/movements', 'MovementsController@index');
+$router->get('/movements/export', 'MovementsController@export');
 
 // Suppliers (CRUD)
 $router->get('/suppliers', 'SuppliersController@index');
