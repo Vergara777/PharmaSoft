@@ -29,6 +29,23 @@
         </div>
       </div>
       <div class="form-group"><label>Stock</label><input type="number" name="stock" class="form-control" value="0" min="0" required></div>
+      
+      <div class="form-row">
+        <div class="form-group col-md-4">
+          <label>Estante</label>
+          <input type="text" name="shelf" class="form-control" maxlength="10" placeholder="Ej: A, B, C...">
+          <small class="text-muted">Letra o número del estante</small>
+        </div>
+        <div class="form-group col-md-4">
+          <label>Fila</label>
+          <input type="number" name="row" class="form-control" min="1" placeholder="Número de fila">
+        </div>
+        <div class="form-group col-md-4">
+          <label>Posición</label>
+          <input type="number" name="position" class="form-control" min="1" placeholder="Número de posición">
+        </div>
+      </div>
+      
       <div class="form-group">
         <label>Precio</label>
         <input type="hidden" name="price" id="priceRaw" value="0">

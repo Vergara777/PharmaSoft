@@ -19,7 +19,61 @@
   .input-group .input-group-append .input-group-text,
   .input-group .input-group-append .btn { border-top-right-radius: 14px; border-bottom-right-radius: 14px; }
   .login-actions { padding: 16px 18px 22px; }
-  .login-btn { height: 52px; border-radius: 18px; font-weight: 800; letter-spacing: .2px; box-shadow: 0 14px 28px rgba(56, 189, 248, .25); background: linear-gradient(90deg, #22d3ee, #60a5fa); border: 0; }
+  .login-btn { height: 52px; border-radius: 18px; font-weight: 800; letter-spacing: .2px; box-shadow: 0 14px 28px rgba(56, 189, 248, .25); background: linear-gradient(90deg, #22d3ee, #60a5fa); border: 0; position: relative; overflow: hidden; }
+  .login-btn .btn-content { 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    position: relative; 
+    z-index: 1; 
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateY(0);
+  }
+  .login-btn .spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+    width: 80px;
+    height: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+  }
+  
+  .login-btn .spinner span {
+    display: block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #fff;
+    animation: bounce 1.5s infinite ease-in-out;
+  }
+  
+  .login-btn .spinner span:nth-child(1) { animation-delay: 0s; }
+  .login-btn .spinner span:nth-child(2) { animation-delay: 0.15s; }
+  .login-btn .spinner span:nth-child(3) { animation-delay: 0.3s; }
+  .login-btn .spinner span:nth-child(4) { animation-delay: 0.45s; }
+  .login-btn.loading .btn-content { 
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  .login-btn.loading .spinner {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  @keyframes bounce {
+    0%, 100% {
+      transform: translateY(0);
+      opacity: 0.6;
+    }
+    50% {
+      transform: translateY(-12px);
+      opacity: 1;
+    }
+  }
   .login-btn:hover { filter: brightness(1.02); box-shadow: 0 18px 34px rgba(56, 189, 248, .32); }
   .login-btn:active { transform: translateY(1px); }
   .login-footer { text-align: center; padding: 10px 18px 18px; color: #6b7280; font-size: 12px; }
@@ -154,7 +208,17 @@
           </div>
         </div>
         <div class="login-actions">
-          <button class="btn btn-primary btn-block login-btn btn-breathe"><i class="fas fa-sign-in-alt mr-2" aria-hidden="true"></i> Entrar</button>
+          <button type="submit" class="btn btn-primary btn-block login-btn btn-breathe" id="loginButton">
+            <span class="btn-content">
+              <i class="fas fa-sign-in-alt mr-2" aria-hidden="true"></i> Entrar
+            </span>
+            <span class="spinner">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
+          </button>
         </div>
       </form>
       <div class="login-footer">© <?= date('Y') ?> PharmaSoft</div>
@@ -189,6 +253,19 @@
           var ic = btn.querySelector('i');
           if (ic) { ic.classList.toggle('fa-eye'); ic.classList.toggle('fa-eye-slash'); }
           btn.setAttribute('aria-label', isPwd ? 'Ocultar contraseña' : 'Mostrar contraseña');
+        });
+      }
+
+      // Manejar el estado de carga del botón
+      var loginForm = document.querySelector('form[action$="/auth/login"]');
+      var loginButton = document.getElementById('loginButton');
+      
+      if (loginForm && loginButton) {
+        loginForm.addEventListener('submit', function(e) {
+          if (loginForm.checkValidity()) {
+            loginButton.disabled = true;
+            loginButton.classList.add('loading');
+          }
         });
       }
 

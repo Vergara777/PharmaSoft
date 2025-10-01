@@ -35,10 +35,10 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
   <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
   <style>
-    /* Loading Overlay */
-    .app-loading-overlay { position: fixed; inset: 0; background: rgba(17,24,39,.45); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); z-index: 5005; display: none; align-items: center; justify-content: center; }
-    .app-loading-box { background: #0b1220; color: #e5e7eb; padding: 18px 22px; border-radius: 12px; box-shadow: 0 24px 60px rgba(0,0,0,.45); display: flex; gap: 14px; align-items: center; min-width: 280px; }
-    .app-spinner { width: 30px; height: 30px; border: 3px solid rgba(255,255,255,.15); border-top-color: #3b82f6; border-radius: 50%; animation: spin .9s linear infinite; }
+    /* Loading Overlay - Deshabilitado */
+    .app-loading-overlay { display: none !important; }
+    .app-loading-box { display: none !important; }
+    .app-spinner { display: none !important; }
     @keyframes spin { to { transform: rotate(360deg); } }
     /* Loading overlay fade */
     .app-loading-overlay.fade-enter { opacity: 0; }

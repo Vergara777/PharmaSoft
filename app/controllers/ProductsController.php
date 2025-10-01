@@ -74,6 +74,7 @@ class ProductsController extends Controller {
         if (!Auth::isAdmin()) { Flash::error('No tienes permisos para crear productos', 'Acceso denegado'); $this->redirect('/products'); return; }
         $categories = (new Category())->all();
         $suppliers = (new Supplier())->all();
+        $suppliers = (new Supplier())->all();
         $this->view('products/create', ['title' => 'Nuevo producto', 'categories' => $categories, 'suppliers' => $suppliers]);
     }
 
@@ -94,6 +95,9 @@ class ProductsController extends Controller {
             'status' => $status,
             'category_id' => isset($_POST['category_id']) && ctype_digit((string)$_POST['category_id']) ? (int)$_POST['category_id'] : null,
             'supplier_id' => isset($_POST['supplier_id']) && ctype_digit((string)$_POST['supplier_id']) ? (int)$_POST['supplier_id'] : null,
+            'shelf' => !empty($_POST['shelf']) ? trim($_POST['shelf']) : null,
+            'row' => !empty($_POST['row']) ? (int)$_POST['row'] : null,
+            'position' => !empty($_POST['position']) ? (int)$_POST['position'] : null,
         ];
         if ($d['sku'] === '' || $d['name'] === '') {
             Flash::error('SKU y Nombre son obligatorios', 'Datos incompletos', 6000, 'top-end');
@@ -175,6 +179,9 @@ class ProductsController extends Controller {
             'status' => $status,
             'category_id' => isset($_POST['category_id']) && ctype_digit((string)$_POST['category_id']) ? (int)$_POST['category_id'] : null,
             'supplier_id' => isset($_POST['supplier_id']) && ctype_digit((string)$_POST['supplier_id']) ? (int)$_POST['supplier_id'] : null,
+            'shelf' => !empty($_POST['shelf']) ? trim($_POST['shelf']) : null,
+            'row' => !empty($_POST['row']) ? (int)$_POST['row'] : null,
+            'position' => !empty($_POST['position']) ? (int)$_POST['position'] : null,
         ];
         if ($d['sku'] === '' || $d['name'] === '') {
             Flash::error('SKU y Nombre son obligatorios', 'Datos incompletos', 6000, 'top-end');

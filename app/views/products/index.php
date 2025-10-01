@@ -293,7 +293,7 @@
       </div>
     <?php else: ?>
     <table class="table table-hover mb-0">
-      <thead><tr><th>#</th><th>SKU</th><th>Nombre</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Caducidad</th><th>Estado</th><th>Acciones</th></tr></thead>
+      <thead><tr><th>#</th><th>SKU</th><th>Nombre</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Ubicación</th><th>Caducidad</th><th>Estado</th><th>Acciones</th></tr></thead>
       <tbody>
         <?php
           // Use date-only comparison to avoid off-by-one from time-of-day
@@ -359,6 +359,19 @@
               <span class="badge badge-<?= $badgeClass ?>" title="<?= !empty($p['expires_at']) ? ('Vence: ' . View::e($p['expires_at'])) : '' ?>"><?= $badgeIconHtml ?><span><?= View::e($stock) ?></span></span>
             </td>
             <td>
+              <?php if (!empty($p['shelf']) || !empty($p['row']) || !empty($p['position'])): ?>
+                <span class="badge bg-primary" 
+                      data-toggle="tooltip" 
+                      data-placement="top" 
+                      title="Estante: <?= htmlspecialchars($p['shelf'] ?? 'N/A') ?> | Fila: <?= htmlspecialchars($p['row'] ?? 'N/A') ?> | Posición: <?= htmlspecialchars($p['position'] ?? 'N/A') ?>">
+                  <i class="fas fa-warehouse"></i> 
+                  <?= htmlspecialchars($p['shelf'] ?? '') ?><?= !empty($p['row']) ? '-' . $p['row'] : '' ?><?= !empty($p['position']) ? '-' . $p['position'] : '' ?>
+                </span>
+              <?php else: ?>
+                <span class="text-muted">—</span>
+              <?php endif; ?>
+            </td>
+            <td>
               <?php if ($days === null): ?>
                 —
               <?php else: ?>
@@ -404,12 +417,16 @@
                       data-supplier="<?= View::e($supName) ?>"
                       data-hasref="<?= (!empty($hasSales) && isset($hasSales[(int)$p['id']])) ? '1' : '0' ?>"
                       data-stkdanger="<?= (int)$STOCK_DANGER ?>"
-                      data-stkwarn="<?= (int)$STOCK_WARN ?>">
+                      data-stkwarn="<?= (int)$STOCK_WARN ?>"
+                      data-shelf="<?= View::e($p['shelf'] ?? '') ?>"
+                      data-row="<?= View::e($p['row'] ?? '') ?>"
+                      data-position="<?= View::e($p['position'] ?? '') ?>">
                 <i class="fas fa-eye mr-1" aria-hidden="true"></i> Ver
               </button>
               <?php
                 $isActiveSt = (strtolower($p['status'] ?? '') === 'active' || strtolower($p['status'] ?? '') === 'activo');
-                $canAddCart = $isActiveSt && $stock > 0 && !($days !== null && $days < 0);
+                // Deshabilitar si el producto no está activo, no tiene stock o ya venció (incluyendo hoy)
+                $canAddCart = $isActiveSt && $stock > 0 && ($days === null || $days > 0);
               ?>
               <button type="button"
                       class="btn btn-sm btn-add-cart-orange btnAddToCartProduct"
@@ -695,6 +712,29 @@
                     <div class="mr-3"><strong>Categoría:</strong> <span id="pd-cat">—</span></div>
                     <div class="mr-3"><strong>Proveedor:</strong> <span id="pd-sup">—</span></div>
                   </div>
+                  <!-- Sección de Ubicación -->
+                  <div class="mb-2">
+                    <h6 class="font-weight-bold mb-1">Ubicación en Almacén</h6>
+                    <div class="d-flex flex-wrap" style="gap: 10px;">
+                      <div class="bg-light p-2 rounded" style="min-width: 100px;">
+                        <div class="text-muted small">Estante</div>
+                        <div id="pd-shelf" class="font-weight-bold">—</div>
+                      </div>
+                      <div class="bg-light p-2 rounded" style="min-width: 80px;">
+                        <div class="text-muted small">Fila</div>
+                        <div id="pd-row" class="font-weight-bold">—</div>
+                      </div>
+                      <div class="bg-light p-2 rounded" style="min-width: 100px;">
+                        <div class="text-muted small">Posición</div>
+                        <div id="pd-position" class="font-weight-bold">—</div>
+                      </div>
+                      <div class="d-flex align-items-end">
+                        <a href="<?= BASE_URL ?>/locations" id="pd-view-map" class="btn btn-sm btn-outline-primary" style="display: none;">
+                          <i class="fas fa-map-marker-alt mr-1"></i> Ver en Mapa
+                        </a>
+                      </div>
+                    </div>
+                  </div>
                   <div>
                     <h6 class="font-weight-bold mb-1">Descripción</h6>
                     <div id="pd-desc">—</div>
@@ -792,6 +832,33 @@
       el = m.querySelector('#pd-cat'); if (el) el.textContent = cat !== '' ? cat : '—';
       var sup = btn.getAttribute('data-supplier') || '';
       el = m.querySelector('#pd-sup'); if (el) el.textContent = sup !== '' ? sup : '—';
+      
+      // Mostrar información de ubicación
+      var shelf = btn.getAttribute('data-shelf') || '';
+      var row = btn.getAttribute('data-row') || '';
+      var position = btn.getAttribute('data-position') || '';
+      
+      el = m.querySelector('#pd-shelf'); if (el) el.textContent = shelf !== '' ? shelf : '—';
+      el = m.querySelector('#pd-row'); if (el) el.textContent = row !== '' ? row : '—';
+      el = m.querySelector('#pd-position'); if (el) el.textContent = position !== '' ? position : '—';
+      
+      // Mostrar botón de ver en mapa solo si hay ubicación
+      var viewMapBtn = m.querySelector('#pd-view-map');
+      if (viewMapBtn) {
+        if (shelf || row || position) {
+          viewMapBtn.style.display = 'inline-flex';
+          // Agregar parámetros de ubicación al enlace del mapa
+          if (shelf) {
+            var mapUrl = '<?= BASE_URL ?>/locations';
+            if (shelf) mapUrl += '?shelf=' + encodeURIComponent(shelf);
+            if (row) mapUrl += (shelf ? '&' : '?') + 'row=' + encodeURIComponent(row);
+            viewMapBtn.href = mapUrl;
+          }
+        } else {
+          viewMapBtn.style.display = 'none';
+        }
+      }
+      
       // Imagen
       try {
         var imgName = btn.getAttribute('data-image') || '';

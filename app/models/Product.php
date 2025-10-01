@@ -7,7 +7,38 @@ use PDO;
 class Product extends Model {
     public function all(): array {
         // Include stock so sales create view can validate availability correctly
-        return $this->db->query("SELECT id, sku, name, description, image, stock, price, expires_at, status, category_id, supplier_id FROM products WHERE status = 'active' ORDER BY name ASC")->fetchAll();
+        return $this->db->query("SELECT id, sku, name, description, image, stock, price, expires_at, status, category_id, supplier_id, shelf, `row`, `position` FROM products WHERE status = 'active' ORDER BY shelf ASC, `row` ASC, `position` ASC, name ASC")->fetchAll();
+    }
+    
+    /**
+     * Obtiene todos los estantes únicos
+     */
+    public function getShelves(): array {
+        return $this->db->query("SELECT DISTINCT shelf FROM products WHERE shelf IS NOT NULL AND shelf != '' ORDER BY shelf")->fetchAll(PDO::FETCH_COLUMN);
+    }
+    
+    /**
+     * Obtiene los productos por estante y fila
+     */
+    public function getProductsByLocation(?string $shelf = null, ?int $row = null): array {
+        $sql = "SELECT * FROM products WHERE status = 'active'";
+        $params = [];
+        
+        if ($shelf !== null) {
+            $sql .= " AND shelf = :shelf";
+            $params[':shelf'] = $shelf;
+            
+            if ($row !== null) {
+                $sql .= " AND `row` = :row";
+                $params[':row'] = $row;
+            }
+        }
+        
+        $sql .= " ORDER BY shelf ASC, `row` ASC, `position` ASC, name ASC";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
     }
     public function search(string $q = '', ?int $categoryId = null): array {
         if ($q === '') {
@@ -227,16 +258,46 @@ class Product extends Model {
     public function create(array $d): int {
         // Assign next display_no sequentially (compact numbering)
         $next = (int)$this->db->query('SELECT COALESCE(MAX(display_no),0)+1 FROM products')->fetchColumn();
-        $sql = 'INSERT INTO products (display_no, sku, name, description, image, stock, price, expires_at, status, category_id, supplier_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)';
+        $sql = 'INSERT INTO products (display_no, sku, name, description, image, stock, price, expires_at, status, category_id, supplier_id, shelf, `row`, `position`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$next,$d['sku'],$d['name'],$d['description'],$d['image'] ?? null,$d['stock'],$d['price'],$d['expires_at'],$d['status'],($d['category_id'] ?? null),($d['supplier_id'] ?? null)]);
+        $stmt->execute([
+            $next,
+            $d['sku'],
+            $d['name'],
+            $d['description'],
+            $d['image'] ?? null,
+            $d['stock'],
+            $d['price'],
+            $d['expires_at'],
+            $d['status'],
+            $d['category_id'] ?? null,
+            $d['supplier_id'] ?? null,
+            $d['shelf'] ?? null,
+            $d['row'] ?? null,
+            $d['position'] ?? null
+        ]);
         return (int)$this->db->lastInsertId();
     }
 
     public function update(int $id, array $d): bool {
-        $sql = 'UPDATE products SET sku=?, name=?, description=?, image=?, stock=?, price=?, expires_at=?, status=?, category_id=?, supplier_id=? WHERE id = ?';
+        $sql = 'UPDATE products SET sku=?, name=?, description=?, image=?, stock=?, price=?, expires_at=?, status=?, category_id=?, supplier_id=?, shelf=?, `row`=?, `position`=? WHERE id = ?';
         $stmt = $this->db->prepare($sql);
-        return $stmt->execute([$d['sku'],$d['name'],$d['description'],$d['image'] ?? null,$d['stock'],$d['price'],$d['expires_at'],$d['status'],($d['category_id'] ?? null),($d['supplier_id'] ?? null),$id]);
+        return $stmt->execute([
+            $d['sku'],
+            $d['name'],
+            $d['description'],
+            $d['image'] ?? null,
+            $d['stock'],
+            $d['price'],
+            $d['expires_at'],
+            $d['status'],
+            $d['category_id'] ?? null,
+            $d['supplier_id'] ?? null,
+            $d['shelf'] ?? null,
+            $d['row'] ?? null,
+            $d['position'] ?? null,
+            $id
+        ]);
     }
 
     public function delete(int $id): bool {

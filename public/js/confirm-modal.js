@@ -61,16 +61,17 @@
   // Expose helper
   window.psConfirm = confirmDialog;
 
-  // Auto-bind forms with .js-confirmable
+  // Auto-bind forms and links with .js-confirmable
   function bindConfirmableForms(){
-    function shouldBypassConfirm(form){
+    function shouldBypassConfirm(element){
       try {
         if (window.psForceImmediateSubmit === true) return true;
       } catch(_){ }
       // Do not bypass by default; always confirm for .js-confirmable
       return false;
     }
-    // Bind only forms explicitly marked as confirmable
+    
+    // Handle form submission confirmation
     var forms = Array.prototype.slice.call(document.querySelectorAll('form.js-confirmable'));
     forms.forEach(function(f){
       // Avoid double-binding
@@ -133,7 +134,54 @@
         }
       }, { capture: true });
     });
-    // Note: If forms are injected dynamically, call bindConfirmableForms() after injection.
+    // Handle link click confirmation
+    var links = Array.prototype.slice.call(document.querySelectorAll('a.js-confirmable'));
+    links.forEach(function(link) {
+      // Avoid double-binding
+      if (link.__psConfirmBound) return; 
+      link.__psConfirmBound = true;
+      
+      link.addEventListener('click', function(ev) {
+        // If already confirmed, allow the default action
+        if (link.__confirmed) return;
+        
+        // If a confirmation is in progress, let it pass to avoid double prompts
+        if (link.getAttribute('data-confirming') === '1') return;
+        
+        ev.preventDefault();
+        
+        // Mark as confirming
+        link.setAttribute('data-confirming', '1');
+        
+        var title = link.getAttribute('data-confirm-title') || 'Confirmación';
+        var text = link.getAttribute('data-confirm-text') || '¿Deseas continuar?';
+        var ok = link.getAttribute('data-confirm-ok') || 'Aceptar';
+        var cancel = link.getAttribute('data-confirm-cancel') || 'Cancelar';
+        var bypass = shouldBypassConfirm(link);
+        
+        if (bypass) {
+          link.__confirmed = true;
+          window.location.href = link.href;
+        } else {
+          confirmDialog({
+            title: title,
+            text: text,
+            ok: ok,
+            cancel: cancel
+          }).then(function(confirmed) {
+            if (confirmed) {
+              link.__confirmed = true;
+              window.location.href = link.href;
+            } else {
+              // Clean flags so user can try again later
+              link.removeAttribute('data-confirming');
+            }
+          });
+        }
+      });
+    });
+    
+    // Note: If forms or links are injected dynamically, call bindConfirmableForms() after injection.
   }
 
   if (document.readyState === 'loading') {

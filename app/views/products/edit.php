@@ -39,6 +39,26 @@
         <input type="file" name="image" accept="image/*" class="form-control-file">
       </div>
       <div class="form-group"><label>Stock</label><input type="number" name="stock" class="form-control" value="<?= View::e($p['stock']) ?>" min="0" required></div>
+      
+      <div class="form-row">
+        <div class="form-group col-md-4">
+          <label>Estante</label>
+          <input type="text" name="shelf" class="form-control" maxlength="10" 
+                 value="<?= View::e($p['shelf'] ?? '') ?>" placeholder="Ej: A, B, C...">
+          <small class="text-muted">Letra o número del estante</small>
+        </div>
+        <div class="form-group col-md-4">
+          <label>Fila</label>
+          <input type="number" name="row" class="form-control" min="1" 
+                 value="<?= View::e($p['row'] ?? '') ?>" placeholder="Número de fila">
+        </div>
+        <div class="form-group col-md-4">
+          <label>Posición</label>
+          <input type="number" name="position" class="form-control" min="1" 
+                 value="<?= View::e($p['position'] ?? '') ?>" placeholder="Número de posición">
+        </div>
+      </div>
+      
       <div class="form-group">
         <label>Precio</label>
         <?php $rawPrice = (int)round((float)($p['price'] ?? 0)); ?>
