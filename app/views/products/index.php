@@ -1347,5 +1347,47 @@
       // initial badge update
       render();
     })();
+
+    // Manejador para el formulario de desactivación
+    document.addEventListener('submit', function(e) {
+      const form = e.target;
+      if (!form || !form.matches('form[action*="/products/retire/"]')) return;
+      
+      // Prevenir el envío normal del formulario
+      e.preventDefault();
+      
+      // Mostrar el diálogo de confirmación
+      Swal.fire({
+        title: '¿Desactivar producto?',
+        text: '¿Estás seguro de que deseas desactivar este producto? El stock se establecerá en 0 y no estará disponible para la venta.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Sí, desactivar',
+        cancelButtonText: 'Cancelar',
+        reverseButtons: true,
+        showLoaderOnConfirm: false,
+        preConfirm: () => {
+          return new Promise((resolve) => {
+            // Enviar el formulario después de un pequeño retraso para permitir que SweetAlert2 cierre el diálogo
+            setTimeout(() => {
+              form.submit();
+              resolve();
+            }, 100);
+          });
+        },
+        allowOutsideClick: () => !Swal.isLoading()
+      }).then((result) => {
+        // Si se cancela, asegurarse de que el indicador de carga se detenga
+        if (result.dismiss === Swal.DismissReason.cancel) {
+          // Forzar la detención del indicador de carga si existe
+          try { if (window.loadingBar && window.loadingBar.stop) window.loadingBar.stop(); } catch(_){}
+          document.body.classList.remove('app-busy');
+          document.documentElement.style.overflow = '';
+          document.body.style.cursor = 'default';
+        }
+      });
+    });
   });
 </script>

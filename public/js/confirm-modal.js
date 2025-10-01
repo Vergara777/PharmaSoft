@@ -61,7 +61,7 @@
   // Expose helper
   window.psConfirm = confirmDialog;
 
-  // Auto-bind forms and links with .js-confirmable
+  // Auto-bind forms and links with .js-confirmable or data-confirm attribute
   function bindConfirmableForms(){
     function shouldBypassConfirm(element){
       try {
@@ -72,7 +72,7 @@
     }
     
     // Handle form submission confirmation
-    var forms = Array.prototype.slice.call(document.querySelectorAll('form.js-confirmable'));
+    var forms = Array.prototype.slice.call(document.querySelectorAll('form.js-confirmable, form[data-confirm]'));
     forms.forEach(function(f){
       // Avoid double-binding
       if (f.__psConfirmBound) return; f.__psConfirmBound = true;
@@ -88,8 +88,11 @@
         // Mark confirming and temporarily skip global jQuery confirm
         f.setAttribute('data-confirming','1');
         f.setAttribute('data-skip-confirm','1');
+        
+        // Get confirmation message from data-confirm attribute if available
+        var confirmMessage = f.getAttribute('data-confirm');
         var title = f.getAttribute('data-confirm-title') || 'Confirmación';
-        var text = f.getAttribute('data-confirm-text') || '¿Deseas continuar?';
+        var text = confirmMessage || f.getAttribute('data-confirm-text') || '¿Deseas continuar?';
         var ok = f.getAttribute('data-confirm-ok') || 'Aceptar';
         var cancel = f.getAttribute('data-confirm-cancel') || 'Cancelar';
         var bypass = shouldBypassConfirm(f);

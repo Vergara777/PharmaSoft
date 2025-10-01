@@ -377,9 +377,19 @@ class ProductsController extends Controller {
         if ($page > $pages) { $page = $pages; }
         $offset = ($page - 1) * $per;
         $slice = array_slice($all, $offset, $per);
-        $this->view('products/index', ['products' => $slice, 'q' => '', 'title' => 'Productos retirados', 'retired' => true, 'pagination' => [
-            'page' => $page, 'per' => $per, 'total' => $total, 'pages' => $pages
-        ]]);
+        $categories = (new Category())->all();
+        $suppliers = (new Supplier())->all();
+        $this->view('products/index', [
+            'products' => $slice,
+            'q' => '',
+            'title' => 'Productos retirados',
+            'retired' => true,
+            'categories' => $categories,
+            'suppliers' => $suppliers,
+            'pagination' => [
+                'page' => $page, 'per' => $per, 'total' => $total, 'pages' => $pages
+            ]
+        ]);
     }
 
     /**
@@ -460,4 +470,3 @@ class ProductsController extends Controller {
         ], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
     }
 }
-
