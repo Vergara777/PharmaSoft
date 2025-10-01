@@ -330,7 +330,7 @@ class Product extends Model {
     }
 
     public function countExpired(): int {
-        return (int)$this->db->query("SELECT COUNT(*) c FROM products WHERE status = 'active' AND expires_at IS NOT NULL AND expires_at < CURDATE()")
+        return (int)$this->db->query("SELECT COUNT(*) c FROM products WHERE status = 'active' AND expires_at IS NOT NULL AND expires_at <= CURDATE()")
             ->fetchColumn();
     }
 
@@ -341,7 +341,7 @@ class Product extends Model {
             $stmt = $this->db->prepare(
                 "DELETE FROM products p
                  WHERE p.expires_at IS NOT NULL
-                   AND p.expires_at < CURDATE()
+                   AND p.expires_at <= CURDATE()
                    AND p.status = 'active'
                    AND NOT EXISTS (SELECT 1 FROM sale_items si WHERE si.product_id = p.id)"
             );
@@ -361,7 +361,7 @@ class Product extends Model {
     }
 
     public function listExpired(): array {
-        $sql = "SELECT * FROM products WHERE status = 'active' AND expires_at IS NOT NULL AND expires_at < CURDATE() ORDER BY expires_at ASC, name ASC";
+        $sql = "SELECT * FROM products WHERE status = 'active' AND expires_at IS NOT NULL AND expires_at <= CURDATE() ORDER BY expires_at ASC, name ASC";
         return $this->db->query($sql)->fetchAll();
     }
 
@@ -374,7 +374,7 @@ class Product extends Model {
     }
 
     public function retireExpired(): int {
-        $stmt = $this->db->prepare("UPDATE products SET status = 'retired', stock = 0 WHERE status = 'active' AND expires_at IS NOT NULL AND expires_at < CURDATE()");
+        $stmt = $this->db->prepare("UPDATE products SET status = 'retired', stock = 0 WHERE status = 'active' AND expires_at IS NOT NULL AND expires_at <= CURDATE()");
         $stmt->execute();
         return $stmt->rowCount();
     }

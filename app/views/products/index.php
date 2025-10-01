@@ -455,12 +455,16 @@
                   $pid = (int)($p['id'] ?? 0);
                   $hasRef = !empty($hasSales) && isset($hasSales[$pid]);
                 ?>
-                <?php /* Botón Desactivar movido al modal de detalles */ ?>
-                <?php if (!$hasRef): ?>
-                <form method="post" action="<?= BASE_URL ?>/products/delete/<?= View::e($pid) ?>" style="display:inline">
-                  <input type="hidden" name="csrf" value="<?= Security::csrfToken() ?>">
-                  <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash-alt mr-1" aria-hidden="true"></i> Eliminar</button>
-                </form>
+                <?php if ($hasRef): ?>
+                  <form method="post" action="<?= BASE_URL ?>/products/retire/<?= View::e($pid) ?>" style="display:inline" data-confirm="¿Seguro que deseas desactivar este producto? El stock se establecerá en 0 y no estará disponible para la venta.">
+                    <input type="hidden" name="csrf" value="<?= Security::csrfToken() ?>">
+                    <button type="submit" class="btn btn-sm btn-warning"><i class="fas fa-ban mr-1" aria-hidden="true"></i> Desactivar</button>
+                  </form>
+                <?php else: ?>
+                  <form method="post" action="<?= BASE_URL ?>/products/delete/<?= View::e($pid) ?>" style="display:inline" data-confirm="¿Seguro que deseas eliminar este producto? Esta acción no se puede deshacer.">
+                    <input type="hidden" name="csrf" value="<?= Security::csrfToken() ?>">
+                    <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash-alt mr-1" aria-hidden="true"></i> Eliminar</button>
+                  </form>
                 <?php endif; ?>
               <?php endif; ?>
               <?php endif; ?>

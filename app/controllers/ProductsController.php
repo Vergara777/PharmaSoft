@@ -308,15 +308,28 @@ class ProductsController extends Controller {
         $page = isset($_GET['page']) && ctype_digit((string)$_GET['page']) && (int)$_GET['page'] > 0 ? (int)$_GET['page'] : 1;
         $per = isset($_GET['per']) && ctype_digit((string)$_GET['per']) && (int)$_GET['per'] > 0 ? min((int)$_GET['per'], 100) : 9;
         if ($per < 9) { $per = 9; }
-        $all = (new Product())->listExpired();
+        $prod = new Product();
+        $all = $prod->listExpired();
         $total = count($all);
         $pages = max(1, (int)ceil($total / $per));
         if ($page > $pages) { $page = $pages; }
         $offset = ($page - 1) * $per;
         $slice = array_slice($all, $offset, $per);
-        $this->view('products/index', ['products' => $slice, 'q' => '', 'title' => 'Productos vencidos', 'pagination' => [
-            'page' => $page, 'per' => $per, 'total' => $total, 'pages' => $pages
-        ]]);
+        $ids = array_map(static function($r){ return (int)($r['id'] ?? 0); }, (array)$slice);
+        $hasSalesIds = array_flip($prod->idsWithSales($ids));
+        $categories = (new Category())->all();
+        $suppliers = (new Supplier())->all();
+        $this->view('products/index', [
+            'products' => $slice, 
+            'q' => '', 
+            'title' => 'Productos vencidos', 
+            'hasSales' => $hasSalesIds,
+            'categories' => $categories,
+            'suppliers' => $suppliers,
+            'pagination' => [
+                'page' => $page, 'per' => $per, 'total' => $total, 'pages' => $pages
+            ]
+        ]);
     }
 
     /**

@@ -1299,11 +1299,19 @@
     if (form) {
       e.preventDefault();
       const ok = await confirmDelete(msg);
-      if (ok) form.submit();
+      if (ok) {
+        form.submit();
+      } else {
+        if (window.loadingBar) window.loadingBar.stop();
+      }
     } else if (el.tagName === 'A') {
       e.preventDefault();
       const ok = await confirmAction({ text: msg || 'Continuar con la acción' });
-      if (ok) window.location.href = el.getAttribute('href');
+      if (ok) {
+        window.location.href = el.getAttribute('href');
+      } else {
+        if (window.loadingBar) window.loadingBar.stop();
+      }
     }
   });
   

@@ -175,6 +175,14 @@
             } else {
               // Clean flags so user can try again later
               link.removeAttribute('data-confirming');
+              // Stop any global loading indicators that may have been triggered
+              if (window.loadingBar && typeof window.loadingBar.stop === 'function') {
+                try {
+                  window.loadingBar.stop();
+                } catch (e) {
+                  console.error('Error stopping loading bar:', e);
+                }
+              }
             }
           });
         }
