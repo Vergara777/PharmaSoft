@@ -594,21 +594,31 @@
           var skuText = (tr.querySelector('td:nth-child(2)')||{}).textContent || '';
           var imgEl = tr.querySelector('td:nth-child(3) img');
           var img = imgEl ? (imgEl.getAttribute('src')||'').split('/').pop() : '';
-          // Extract category/supplier robustly regardless of description presence
-          var smEls = tr.querySelectorAll('td:nth-child(3) small');
+          // Extraer descripción, categoría y proveedor
+          var descTxt = '';
           var catTxt = '';
           var supTxt = '';
+          
+          // Buscar todos los elementos small.text-muted en la celda del producto
+          var smEls = tr.querySelectorAll('td:nth-child(3) .small.text-muted');
           smEls.forEach(function(sm){
             var t = (sm.textContent || '').trim();
             if (!t) return;
             var low = t.toLowerCase();
-            if (low.indexOf('categoría:') === 0) catTxt = t.replace(/^Categoría:\s*/i,'').trim();
-            if (low.indexOf('proveedor:') === 0) supTxt = t.replace(/^Proveedor:\s*/i,'').trim();
+            if (low.indexOf('categoría:') === 0) {
+              catTxt = t.replace(/^Categoría:\s*/i,'').trim();
+            } else if (low.indexOf('proveedor:') === 0) {
+              supTxt = t.replace(/^Proveedor:\s*/i,'').trim();
+            } else {
+              // Si no es ni categoría ni proveedor, es la descripción
+              descTxt = t.trim();
+            }
           });
           items.push({
             product_id: pid,
             sku: skuText.trim(),
             name: nameText.trim(),
+            description: descTxt, // Incluir la descripción
             qty: Math.max(1, parseInt((qtyEl&&qtyEl.value)||'1',10)||1),
             unit_price: Math.max(0, Math.round(parseFloat((prEl&&prEl.value)||'0')||0)),
             image: img,
@@ -766,8 +776,14 @@
       if (!pid) return;
       var sku = d.sku || '';
       var name = d.name || '';
-      var desc = d.description || '';
+      // Obtener la descripción de cualquier campo posible
+      var desc = (d.desc || d.description || d.descripcion || '').trim();
+      // Get status and clean the name from any existing status badge or 'OK' text
       var status = (d.status || 'ok');
+      // Remove any existing status badge from the name to prevent duplicates
+      name = name.replace(/\s*<span class="badge[^"]*">[^<]*<\/span>\s*$/, '').trim();
+      // Remove any trailing 'OK' text to prevent duplication with the badge
+      name = name.replace(/\s*OK\s*$/i, '').trim();
       var stock = parseInt(d.stock || '0', 10) || 0;
       var imgName = d.image || '';
       var catName = d.category_name || '';
@@ -782,7 +798,7 @@
       tr.innerHTML = `
         <td class="align-middle">${idx}</td>
         <td class="align-middle">${sku}</td>
-        <td class="align-middle" title="Precio: ${fmtCOP(p)} | Stock: ${isNaN(stock)?0:stock}">${imgHtml}<div class="d-flex flex-column"><span>${name} ${badgeFor(status)}</span>${desc ? `<small class=\"text-muted\">${desc}</small>` : ''}${catName ? `<small class=\"text-muted\">Categoría: ${catName}</small>` : ''}${supName ? `<small class=\"text-muted\">Proveedor: ${supName}</small>` : ''}</div></td>
+        <td class="align-middle" title="Precio: ${fmtCOP(p)} | Stock: ${isNaN(stock)?0:stock}">${imgHtml}<div class="d-flex flex-column"><span>${name} ${badgeFor(status)}</span>${desc ? `<div class="small text-muted" style="white-space: pre-line;">${desc}</div>` : ''}${catName ? `<div class="small text-muted">Categoría: ${catName}</div>` : ''}${supName ? `<div class="small text-muted">Proveedor: ${supName}</div>` : ''}</div></td>
         <td class="text-right"><input type="number" class="form-control form-control-sm text-right" name="qty[]" min="1" step="1" value="${q}"></td>
         <td class="text-right"><input type="number" class="form-control form-control-sm text-right" name="unit_price[]" min="0" step="1" value="${p}"></td>
         <td class="text-right line-import">$0</td>
@@ -911,7 +927,9 @@
         try { centerLoading.show('Agregando...', 4000); } catch(_){ }
         const sku = (opt && (opt.getAttribute('data-sku'))) || (cp ? cp.sku : '') || '';
         const name = (opt && (opt.getAttribute('data-name') || opt.textContent.trim())) || (cp ? cp.name : '') || '';
-        const desc = (opt && (opt.getAttribute('data-description'))) || (cp ? cp.description : '') || '';
+        // Obtener la descripción de cualquier atributo posible
+        const desc = (opt && (opt.getAttribute('data-desc') || opt.getAttribute('data-description') || opt.getAttribute('data-descripcion'))) || 
+                   (cp ? (cp.desc || cp.description || cp.descripcion) : '') || '';
         const stockRaw = (opt && opt.getAttribute('data-stock'));
         const stock = (stockRaw === null || stockRaw === '') ? NaN : parseInt(stockRaw, 10);
         const imgName = (opt && opt.getAttribute('data-image')) || (cp ? cp.image : '') || '';
@@ -927,7 +945,15 @@
         tr.innerHTML = `
           <td class="align-middle">${idx}</td>
           <td class="align-middle">${sku}</td>
-          <td class="align-middle" title="Precio: ${fmtCOP(p)} | Stock: ${isNaN(stock)?0:stock}">${imgHtml}<div class="d-flex flex-column"><span>${name} ${badgeFor(status)}</span>${desc ? `<small class=\"text-muted\">${desc}</small>` : ''}${catName ? `<small class=\"text-muted\">Categoría: ${catName}</small>` : ''}${supName ? `<small class=\"text-muted\">Proveedor: ${supName}</small>` : ''}</div></td>
+          <td class="align-middle" title="Precio: ${fmtCOP(p)} | Stock: ${isNaN(stock)?0:stock}">
+            ${imgHtml}
+            <div class="d-flex flex-column">
+              <span>${name} ${badgeFor(status)}</span>
+              ${desc ? `<div class="small text-muted" style="white-space: pre-line;">${desc}</div>` : ''}
+              ${catName ? `<div class="small text-muted">Categoría: ${catName}</div>` : ''}
+              ${supName ? `<div class="small text-muted">Proveedor: ${supName}</div>` : ''}
+            </div>
+          </td>
           <td class="text-right"><input type="number" class="form-control form-control-sm text-right" name="qty[]" min="1" step="1" value="${q}"></td>
           <td class="text-right"><input type="number" class="form-control form-control-sm text-right" name="unit_price[]" min="0" step="1" value="${p}"></td>
           <td class="text-right line-import">$0</td>
