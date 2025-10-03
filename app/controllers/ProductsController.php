@@ -338,7 +338,24 @@ class ProductsController extends Controller {
     public function expiring30(): void {
         if (!Auth::check()) { $this->redirect('/auth/login'); }
         $products = (new Product())->listExpiringWithin(30);
-        $this->view('products/index', ['products' => $products, 'q' => '', 'title' => 'Productos por vencer (≤ 30 días)']);
+        $categories = (new Category())->all();
+        $suppliers = (new Supplier())->all();
+        
+        // Create a map of category IDs to names for the view
+        $catMap = [];
+        foreach ($categories as $cat) {
+            $catMap[$cat['id']] = $cat['name'];
+        }
+        
+        $this->view('products/index', [
+            'products' => $products, 
+            'q' => '', 
+            'title' => 'Productos por vencer (≤ 30 días)',
+            'categories' => $categories,
+            'suppliers' => $suppliers,
+            'catMap' => $catMap,
+            'pagination' => null
+        ]);
     }
 
     /**

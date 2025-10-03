@@ -367,7 +367,15 @@ class Product extends Model {
 
     public function listExpiringWithin(int $days): array {
         if ($days < 0) { $days = 0; }
-        $stmt = $this->db->prepare("SELECT * FROM products WHERE status = 'active' AND expires_at IS NOT NULL AND expires_at >= CURDATE() AND expires_at <= DATE_ADD(CURDATE(), INTERVAL :d DAY) ORDER BY expires_at ASC, name ASC");
+        $sql = "SELECT p.*, c.name as category_name 
+                FROM products p 
+                LEFT JOIN categories c ON p.category_id = c.id 
+                WHERE p.status = 'active' 
+                AND p.expires_at IS NOT NULL 
+                AND p.expires_at >= CURDATE() 
+                AND p.expires_at <= DATE_ADD(CURDATE(), INTERVAL :d DAY) 
+                ORDER BY p.expires_at ASC, p.name ASC";
+        $stmt = $this->db->prepare($sql);
         $stmt->bindValue(':d', $days, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
