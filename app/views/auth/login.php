@@ -1,34 +1,230 @@
 <?php use App\Core\View; use App\Helpers\Security; ?>
 <style>
-  /* Scoped to login view */
-  .login-shell { min-height: calc(100vh - 60px); display: grid; place-items: center; padding: 24px 12px; }
-  .login-modal { width: 100%; max-width: 460px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 20px; box-shadow: 0 30px 80px rgba(0,0,0,.18); overflow: hidden; }
-  .login-header { padding: 24px 22px; display: flex; align-items: center; justify-content: flex-start; gap: 12px; background: linear-gradient(135deg, #22d3ee, #a78bfa); color: #111827; position: relative; text-align: left; }
-  .login-header:after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(80% 60% at 10% 10%, rgba(255,255,255,.06), transparent 60%); }
-  .login-logo { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: #0f172a; color: #fff; box-shadow: 0 8px 24px rgba(99,102,241,.35), inset 0 -2px 0 rgba(0,0,0,.25); font-size: 22px; border: 1px solid rgba(255,255,255,.08); }
-  .login-title { margin: 0; font-weight: 900; letter-spacing: .2px; font-size: 1.45rem; line-height: 1; filter: drop-shadow(0 2px 6px rgba(0,0,0,.25)); }
-  .login-sub { margin: 2px 0 0; opacity: .85; font-size: 12px; }
-  .login-body { padding: 20px 18px; }
-  .login-body .form-group label { font-weight: 600; color: #374151; }
-  .login-body .form-control { height: 48px; border-radius: 14px; border: 1px solid #d1d5db; transition: box-shadow .25s ease, border-color .25s ease; }
-  .login-body .form-control:focus { border-color: #60a5fa; box-shadow: 0 0 0 4px rgba(59,130,246,.15); }
-  .login-body .input-group-text { background: #f3f4f6; border: 1px solid #d1d5db; border-left: 0; }
-  .input-group .form-control + .input-group-append .input-group-text,
-  .input-group .form-control + .input-group-append .btn { border-top-left-radius: 0; border-bottom-left-radius: 0; }
-  .input-group .form-control { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-  .input-group .input-group-append .input-group-text,
-  .input-group .input-group-append .btn { border-top-right-radius: 14px; border-bottom-right-radius: 14px; }
-  .login-actions { padding: 16px 18px 22px; }
-  .login-btn { height: 52px; border-radius: 18px; font-weight: 800; letter-spacing: .2px; box-shadow: 0 14px 28px rgba(56, 189, 248, .25); background: linear-gradient(90deg, #22d3ee, #60a5fa); border: 0; position: relative; overflow: hidden; }
-  .login-btn .btn-content { 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
-    position: relative; 
-    z-index: 1; 
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  :root {
+    --primary: #2563eb;
+    --primary-light: #3b82f6;
+    --primary-dark: #1d4ed8;
+    --text: #1f2937;
+    --text-light: #6b7280;
+    --border: #e5e7eb;
+    --bg: #f9fafb;
+    --white: #ffffff;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --transition: all 0.2s ease-in-out;
+  }
+
+  body.login-body {
+    background: var(--bg);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    margin: 0;
+    padding: 0;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  .login-shell {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  }
+
+  .login-container {
+    width: 100%;
+    max-width: 420px;
+    background: var(--white);
+    border-radius: 1rem;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .login-header {
+    padding: 2rem 2rem 1.5rem;
+    text-align: center;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: white;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .login-header::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at 20% 20%, rgba(255,255,255,0.2) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .login-logo {
+    width: 3.5rem;
+    height: 3.5rem;
+    margin: 0 auto 1rem;
+    background: var(--white);
+    border-radius: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: var(--primary);
+    font-weight: 800;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+
+  .login-title {
+    margin: 0 0 0.25rem;
+    font-size: 1.5rem;
+    font-weight: 800;
+    position: relative;
+    z-index: 1;
+  }
+
+  .login-subtitle {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 0.875rem;
+    font-weight: 400;
+    position: relative;
+    z-index: 1;
+  }
+
+  .login-body {
+    padding: 2rem;
+  }
+
+  .form-group {
+    margin-bottom: 1.25rem;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text);
+    font-size: 0.875rem;
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--text);
+    background-color: var(--white);
+    background-clip: padding-box;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    transition: var(--transition);
+  }
+
+  .form-control:focus {
+    border-color: var(--primary);
+    outline: 0;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  .input-group {
+    position: relative;
+    display: flex;
+    width: 100%;
+  }
+
+  .input-group .form-control {
+    position: relative;
+    flex: 1 1 auto;
+    width: 1%;
+    min-width: 0;
+    margin-bottom: 0;
+  }
+
+  .input-group-append {
+    margin-left: -1px;
+    display: flex;
+  }
+
+  .input-group-text {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--text-light);
+    text-align: center;
+    white-space: nowrap;
+    background-color: #f9fafb;
+    border: 1px solid var(--border);
+    border-left: 0;
+    border-radius: 0 0.5rem 0.5rem 0;
+  }
+
+  .login-actions {
+    margin-top: 1.5rem;
+  }
+
+  .login-btn {
+    display: block;
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.5;
+    color: white;
+    text-align: center;
+    text-decoration: none;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .login-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.2);
+  }
+
+  .login-btn:active {
     transform: translateY(0);
   }
+
+  .login-footer {
+    padding: 1.25rem 2rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-light);
+    background-color: #f9fafb;
+    border-top: 1px solid var(--border);
+  }
+
+  .login-footer a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .login-footer a:hover {
+    text-decoration: underline;
+  }
+
+  /* Loading spinner */
+  .login-btn .btn-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+    transition: var(--transition);
+  }
+
   .login-btn .spinner {
     position: absolute;
     top: 50%;
@@ -40,64 +236,66 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: all 0.3s ease;
+    transition: var(--transition);
   }
   
   .login-btn .spinner span {
     display: block;
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     background-color: #fff;
-    animation: bounce 1.5s infinite ease-in-out;
+    animation: bounce 1.4s infinite ease-in-out;
   }
   
   .login-btn .spinner span:nth-child(1) { animation-delay: 0s; }
-  .login-btn .spinner span:nth-child(2) { animation-delay: 0.15s; }
-  .login-btn .spinner span:nth-child(3) { animation-delay: 0.3s; }
-  .login-btn .spinner span:nth-child(4) { animation-delay: 0.45s; }
+  .login-btn .spinner span:nth-child(2) { animation-delay: 0.16s; }
+  .login-btn .spinner span:nth-child(3) { animation-delay: 0.32s; }
+  
   .login-btn.loading .btn-content { 
     opacity: 0;
-    transform: translateY(-2px);
+    transform: translateY(5px);
   }
+  
   .login-btn.loading .spinner {
     transform: translate(-50%, -50%) scale(1);
     opacity: 1;
   }
+  
   @keyframes bounce {
-    0%, 100% {
-      transform: translateY(0);
-      opacity: 0.6;
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-8px); }
+  }
+
+  /* Error message */
+  .alert {
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid transparent;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+  }
+
+  .alert-danger {
+    color: #991b1b;
+    background-color: #fee2e2;
+    border-color: #fecaca;
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 480px) {
+    .login-container {
+      border-radius: 0.75rem;
     }
-    50% {
-      transform: translateY(-12px);
-      opacity: 1;
+    
+    .login-header {
+      padding: 1.5rem 1.5rem 1.25rem;
+    }
+    
+    .login-body {
+      padding: 1.5rem;
     }
   }
-  .login-btn:hover { filter: brightness(1.02); box-shadow: 0 18px 34px rgba(56, 189, 248, .32); }
-  .login-btn:active { transform: translateY(1px); }
-  .login-footer { text-align: center; padding: 10px 18px 18px; color: #6b7280; font-size: 12px; }
-  /* Make background neutral when login is active */
-  body.login-body { background: #f3f4f6; }
-
-  /* Brand-style gradient (blue→violet) like dashboard with safe fallback */
-  .brand-text { display:inline-block; color: #111827; }
-  .brand-icon { color: #ffffff; }
-  .brand-glow { text-shadow: 0 0 10px rgba(99,102,241,.35), 0 0 18px rgba(59,130,246,.18); }
-  /* Enable true gradient text/icon only when supported */
-  .supports-text-clip .brand-text { background: linear-gradient(90deg, #2563eb, #8b5cf6); background-clip: text; -webkit-background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
-  .supports-text-clip .brand-icon { background: linear-gradient(90deg, #2563eb, #8b5cf6); background-clip: text; -webkit-background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
-  .login-logo { position: relative; }
-  /* Remove RGB ring/glow */
-  .login-logo:before,
-  .login-logo:after { content: none; }
-
-  /* Remove RGB-related keyframes and effects */
-
-  /* Breathing animations */
-  .btn-breathe { animation: breathe 3.2s ease-in-out infinite; transform-origin: center; }
-  @keyframes breathe { 0%, 100% { transform: scale(1); box-shadow: 0 8px 22px rgba(56,189,248,.24); } 50% { transform: scale(1.06); box-shadow: 0 12px 28px rgba(56,189,248,.33); } }
-  .title-breathe { animation: titleBreath 10s cubic-bezier(.4,0,.2,1) infinite; display: inline-block; will-change: transform; transform-origin: center; }
   .icon-breathe { animation: iconBreath 10s cubic-bezier(.4,0,.2,1) infinite; will-change: transform; transform-origin: center; }
   @keyframes titleBreath { 0%,100% { transform: scale(1); } 50% { transform: scale(1.24); } }
   @keyframes iconBreath  { 0%,100% { transform: scale(1); } 50% { transform: scale(1.26); } }
@@ -151,14 +349,15 @@
 </style>
 
 <div class="login-shell">
-  <div class="login-modal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+  <div class="login-container">
     <div class="login-header">
-      <div class="login-logo" aria-hidden="true"><i class="fas fa-capsules brand-icon brand-glow rgb-outline icon-breathe"></i></div>
-      <div>
-        <h3 id="loginTitle" class="login-title brand-glow rgb-outline title-breathe">PharmaSoft</h3>
-        <div class="login-sub">Iniciar sesión</div>
+      <div class="login-logo">
+        <i class="fas fa-capsules"></i>
       </div>
+      <h1 class="login-title">PharmaSoft</h1>
+      <p class="login-subtitle">Sistema de Gestión Farmacéutica</p>
     </div>
+    
     <?php if (!empty($errorEmail) || !empty($errorPassword)): ?>
       <?php $isEmailErr = !empty($errorEmail); ?>
       <div class="login-toast-wrap" aria-modal="true" role="dialog">
@@ -186,15 +385,26 @@
         </div>
       </div>
     <?php endif; ?>
+    
     <div class="login-body">
-      <form method="post" action="<?= BASE_URL ?>/auth/login" data-loading-text="Iniciando sesión...">
+      <form method="post" action="<?= BASE_URL ?>/auth/login" data-loading-text="Iniciando sesión..." id="loginForm">
         <input type="hidden" name="csrf" value="<?= Security::csrfToken() ?>">
+        
         <div class="form-group">
-          <label for="loginEmail">Email</label>
+          <label for="loginEmail">Correo electrónico</label>
           <div class="input-group">
-            <input id="loginEmail" type="email" name="email" class="form-control<?= !empty($errorEmail) ? ' invalid' : '' ?>" placeholder="tu@correo.com" required autofocus value="<?= isset($email) ? View::e($email) : '' ?>">
+            <input id="loginEmail" 
+                   type="email" 
+                   name="email" 
+                   class="form-control<?= !empty($errorEmail) ? ' invalid' : '' ?>" 
+                   placeholder="tu@correo.com" 
+                   required 
+                   autofocus 
+                   value="<?= isset($email) ? View::e($email) : '' ?>">
             <div class="input-group-append">
-              <span class="input-group-text"><i class="fas fa-at" aria-hidden="true"></i></span>
+              <span class="input-group-text">
+                <i class="fas fa-envelope" aria-hidden="true"></i>
+              </span>
             </div>
           </div>
         </div>
