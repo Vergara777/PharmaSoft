@@ -113,6 +113,7 @@
   .form-control {
     width: 100%;
     padding: 0.75rem 1rem;
+    height: calc(1.5em + 1.5rem + 2px);
     font-size: 1rem;
     line-height: 1.5;
     color: var(--text);
@@ -121,6 +122,7 @@
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     transition: var(--transition);
+    box-sizing: border-box;
   }
 
   .form-control:focus {
@@ -133,6 +135,8 @@
     position: relative;
     display: flex;
     width: 100%;
+    height: calc(1.5em + 1.5rem + 2px);
+    align-items: stretch;
   }
 
   .input-group .form-control {
@@ -151,7 +155,7 @@
   .input-group-text {
     display: flex;
     align-items: center;
-    padding: 0.75rem 1rem;
+    padding: 0 1rem;
     font-size: 1rem;
     font-weight: 400;
     line-height: 1.5;
@@ -162,6 +166,7 @@
     border: 1px solid var(--border);
     border-left: 0;
     border-radius: 0 0.5rem 0.5rem 0;
+    height: 100%;
   }
 
   .login-actions {

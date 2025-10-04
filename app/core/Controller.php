@@ -37,4 +37,33 @@ class Controller {
         header('Location: ' . $base . $path);
         exit;
     }
+    
+    /**
+     * Format a date as a human-readable time ago string
+     * 
+     * @param string $datetime MySQL datetime string
+     * @return string Human readable time ago string
+     */
+    protected function timeAgo($datetime) {
+        $time = strtotime($datetime);
+        $time = time() - $time; // to get the time since that moment
+        
+        $tokens = array (
+            31536000 => 'año',
+            2592000 => 'mes',
+            604800 => 'semana',
+            86400 => 'día',
+            3600 => 'hora',
+            60 => 'minuto',
+            1 => 'segundo'
+        );
+        
+        foreach ($tokens as $unit => $text) {
+            if ($time < $unit) continue;
+            $numberOfUnits = floor($time / $unit);
+            return 'Hace ' . $numberOfUnits . ' ' . $text . (($numberOfUnits > 1) ? 's' : '');
+        }
+        
+        return 'Recién';
+    }
 }

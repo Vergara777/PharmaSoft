@@ -47,6 +47,7 @@ $router->get('/', 'AuthController@login');
 $router->get('/auth/login', 'AuthController@login');
 $router->post('/auth/login', 'AuthController@doLogin');
 $router->get('/auth/logout', 'AuthController@logout');
+$router->get('/auth/login-logs', 'AuthController@loginLogs');
 
 // Dashboard
 $router->get('/dashboard', 'DashboardController@index');
@@ -74,8 +75,9 @@ $router->get('/products/retired', 'ProductsController@retired');
 $router->post('/products/reactivate/{id}', 'ProductsController@reactivate');
 // Toggle active->retired
 $router->post('/products/retire/{id}', 'ProductsController@retire');
-// Products JSON (for modals)
+// Products JSON (for modals and search)
 $router->get('/products/show/{id}', 'ProductsController@show');
+$router->get('/products/search', 'ProductsController@search');
 
 // Notifications
 $router->get('/notifications/alerts', 'NotificationsController@alerts');

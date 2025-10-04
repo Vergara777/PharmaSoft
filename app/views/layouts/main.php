@@ -427,6 +427,7 @@
             <li class="nav-item"><a href="<?= BASE_URL ?>/suppliers" class="nav-link"><i class="nav-icon fas fa-truck"></i><p>Proveedores</p></a></li>
             <li class="nav-item"><a href="<?= BASE_URL ?>/categories" class="nav-link"><i class="nav-icon fas fa-tags"></i><p>Categorías</p></a></li>
             <li class="nav-item"><a href="<?= BASE_URL ?>/movements" class="nav-link"><i class="nav-icon fas fa-history"></i><p>Movimientos</p></a></li>
+            <li class="nav-item"><a href="<?= BASE_URL ?>/auth/login-logs" class="nav-link"><i class="nav-icon fas fa-sign-in-alt"></i><p>Registro de Accesos</p></a></li>
           <?php endif; ?>
           <li class="nav-item"><a href="<?= BASE_URL ?>/profile" class="nav-link"><i class="nav-icon fas fa-user"></i><p>Perfil</p></a></li>
         </ul>
@@ -532,6 +533,8 @@
   <span id="psCoTimeText"><?php echo htmlspecialchars($coNow->format('h:i:s A')); ?></span>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery-ui@1.13.2/dist/jquery-ui.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jquery-ui@1.13.2/dist/themes/base/jquery-ui.min.css">
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.7/dist/sweetalert2.all.min.js"></script>
