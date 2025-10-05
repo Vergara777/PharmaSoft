@@ -491,9 +491,20 @@
         var closeBtn = document.getElementById('toastCloseBtn');
         var fixBtn = document.getElementById('toastFixBtn');
         var wrap = document.querySelector('.login-toast-wrap');
+        var emailInput = document.getElementById('loginEmail');
+        var passInput = document.getElementById('loginPass');
+
+        // Set inputs to readonly to prevent browser UI from overlapping the modal
+        if (emailInput) emailInput.readOnly = true;
+        if (passInput) passInput.readOnly = true;
+
         function closeToast(){
           if (!toast) return;
           try {
+            // Make inputs writable again
+            if (emailInput) emailInput.readOnly = false;
+            if (passInput) passInput.readOnly = false;
+
             toast.style.animation = 'toastOut .18s ease-in forwards';
             setTimeout(function(){
               if (wrap && wrap.parentNode) { wrap.parentNode.removeChild(wrap); }

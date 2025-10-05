@@ -46,21 +46,36 @@
     .app-loading-overlay.fade-exit { opacity: 1; }
     .app-loading-overlay.fade-exit-active { opacity: 0; transition: opacity .18s ease-in; }
     /* Toasts */
-    /* Force dark toast background and light text with high specificity */
-    /* Toast container: force top-right placement only for our toasts */
-    .swal2-container.ps-toast-container { justify-content: flex-end !important; align-items: flex-start !important; padding: 12px 16px !important; }
-    .swal2-container .swal2-popup.ps-toast { background: #0b1220 !important; color: #e5e7eb !important; border-radius: 14px; padding: 12px 14px; box-shadow: none !important; width: 300px; border: 1px solid rgba(255,255,255,.06); }
+    .swal2-container.ps-toast-container { justify-content: flex-end !important; align-items: flex-start !important; padding: 16px !important; }
+    .swal2-container .swal2-popup.ps-toast {
+      background: rgba(255, 255, 255, 0.8) !important;
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+      color: #1f2937 !important;
+      border-radius: 16px;
+      padding: 16px;
+      width: 350px;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+    }
     .swal2-container .swal2-popup.ps-toast .swal2-html-container { color: inherit !important; margin: 0 !important; }
-    .swal2-popup.ps-toast .swal2-close { color: #e5e7eb; opacity: .7; }
-    .swal2-popup.ps-toast .swal2-timer-progress-bar { height: 4px; background: #22c55e; border-radius: 0 0 12px 12px; }
-    .ps-toast-body { display: grid; grid-template-columns: 46px 1fr; gap: 14px; align-items: flex-start; }
-    .ps-toast-icon { width: 46px; height: 46px; border-radius: 11px; display: grid; place-items: center; color: #ffffff; font-size: 18px; box-shadow: none !important; }
-    .ps-toast-title { font-weight: 900; color: #f9fafb; margin-top: 0; font-size: 15px; }
-    .ps-toast-text { color: #f3f4f6; opacity: .98; margin-top: 4px; font-size: 14px; font-weight: 700; }
-    .ps-toast.ps-success .ps-toast-icon { background: #0b1220; color: #22c55e; border: 2px solid #22c55e; }
-    .ps-toast.ps-warning .ps-toast-icon { background: #fcd34d; }
-    .ps-toast.ps-error .ps-toast-icon { background: #fca5a5; }
-    .ps-toast.ps-info .ps-toast-icon { background: #93c5fd; }
+    .swal2-popup.ps-toast .swal2-close { color: #374151; opacity: .8; }
+    .swal2-popup.ps-toast .swal2-timer-progress-bar { height: 5px; border-radius: 0 0 14px 14px; }
+    .ps-toast-body { display: grid; grid-template-columns: 42px 1fr; gap: 16px; align-items: center; }
+    .ps-toast-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-size: 20px;
+    }
+    .ps-toast-title { font-weight: 800; color: #111827; font-size: 16px; margin: 0; }
+    .ps-toast-text { color: #374151; font-weight: 600; margin-top: 4px; font-size: 14px; }
+    .ps-toast.ps-success .ps-toast-icon { background: #ecfdf5; color: #16a34a; }
+    .ps-toast.ps-error .ps-toast-icon { background: #fef2f2; color: #dc2626; }
+    .ps-toast.ps-warning .ps-toast-icon { background: #fffbeb; color: #d97706; }
+    .ps-toast.ps-info .ps-toast-icon { background: #eff6ff; color: #2563eb; }
     .ps-toast.ps-success .swal2-timer-progress-bar { background: #22c55e; }
     .ps-toast.ps-warning .swal2-timer-progress-bar { background: #f59e0b; }
     .ps-toast.ps-error .swal2-timer-progress-bar { background: #ef4444; }
@@ -329,9 +344,9 @@
     }
     .sidebar-hidden .ps-topbrand .icon { animation: psIconGlow 2.2s ease-in-out infinite alternate; }
     @keyframes psHue { 0% { background-position: 0% 50%; } 100% { background-position: 100% 50%; } }
-    @keyframes psGlow { 0% { text-shadow: 0 0 0px rgba(99,102,241,.0), 0 0 0px rgba(147,197,253,.0); }
+    @keyframes psGlow { 0% { text-shadow: 0 0 0px rgba(99,102,241,.0), 0 0 0px rgba(147,197,253,.0); } 
                          100% { text-shadow: 0 0 10px rgba(99,102,241,.35), 0 0 18px rgba(147,197,253,.25); } }
-    @keyframes psIconGlow { 0% { box-shadow: 0 0 0 rgba(59,130,246,0); }
+    @keyframes psIconGlow { 0% { box-shadow: 0 0 0 rgba(59,130,246,0); } 
                             100% { box-shadow: 0 0 16px rgba(59,130,246,.45); } }
     @keyframes psFloat { 0% { transform: translateY(0); } 50% { transform: translateY(-1px); } 100% { transform: translateY(0); } }
     @media (prefers-reduced-motion: reduce) {
@@ -580,7 +595,7 @@
     };
     const readCookie = (name) => {
       try {
-        const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}\\(\\)\\[\\]\\/\\+^])/g,'\\$1') + '=([^;]*)'));
+        const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}\]\[\/\+^])/g,'\$1') + '=([^;]*)'));
         return m ? decodeURIComponent(m[1]) : null;
       } catch(_) { return null; }
     };
@@ -671,7 +686,7 @@
     }
     function apply(mode){ body.classList.toggle('dark-mode', mode === 'dark'); updateBtn(mode); }
     function read(){ try { return localStorage.getItem(KEY); } catch(_) { return null; } }
-    function write(v){ try { localStorage.setItem(KEY, v); } catch(_){} }
+    function write(v){ try { localStorage.setItem(KEY, v); } catch(_){}
     function sysPref(){ try { return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; } catch(_) { return 'light'; } }
     let saved = read(); let mode = saved || sysPref(); apply(mode);
     function toggle(){ const current = body.classList.contains('dark-mode') ? 'dark' : 'light'; const next = current === 'dark' ? 'light' : 'dark'; apply(next); write(next); }
@@ -694,7 +709,7 @@
     toast: true,
     position: 'top-end',
     showConfirmButton: false,
-    timer: 4000,
+    timer: 10000,
     timerProgressBar: true,
     showCloseButton: true,
     customClass: { container: 'ps-toast-container' },
@@ -734,8 +749,8 @@
     const close = el.querySelector('.ps-fallback-close');
     close.addEventListener('click', () => { container.removeChild(el); });
     if (!options.sticky) {
-      // Force default 4s timer unless sticky or explicitly set
-      const ttl = Math.max(2000, options.timer || 4000);
+      // Force default 10s timer unless sticky or explicitly set
+      const ttl = Math.max(2000, options.timer || 10000);
       bar.style.transform = 'scaleX(1)';
       bar.style.transition = `transform ${ttl}ms linear`;
       requestAnimationFrame(() => { bar.style.transform = 'scaleX(0)'; });
@@ -764,8 +779,8 @@
       <div class="ps-toast-body">
         <div class="ps-toast-icon"><i class="fas ${map.icon}"></i></div>
         <div>
-          ${title ? `<div class=\"ps-toast-title\">${title}</div>` : ''}
-          ${text ? `<div class=\"ps-toast-text\">${text}</div>` : ''}
+          ${title ? `<div class="ps-toast-title">${title}</div>` : ''}
+          ${text ? `<div class="ps-toast-text">${text}</div>` : ''}
         </div>
       </div>`;
     if (window.Swal && Toast) {
@@ -777,11 +792,15 @@
       delete clean.title; delete clean.text; delete clean.html; delete clean.icon;
       // Ignore any incoming position to guarantee top-right
       delete clean.position;
-      // Ensure a default 4s timer unless sticky or explicitly set
-      if (!clean.sticky && (typeof clean.timer === 'undefined' || clean.timer === null)) { clean.timer = 4000; }
-      // Enforce high-contrast colors
-      clean.background = '#0b1220';
-      clean.color = '#e5e7eb';
+      // Ensure a default 10s timer unless sticky or explicitly set
+      if (!clean.sticky && (typeof clean.timer === 'undefined' || clean.timer === null)) { clean.timer = 10000; }
+      // Enforce high-contrast colors for dark theme, but use new light theme for light mode
+      if (document.body.classList.contains('dark-mode')) {
+        clean.background = '#0b1220';
+        clean.color = '#e5e7eb';
+      } else {
+        // Light theme is handled by the new CSS rules, no need for inline overrides
+      }
       if (options.sticky) { clean.timer = undefined; clean.showCloseButton = true; }
       // Merge with clean last but keep position enforced at the end
       Toast.fire(Object.assign({}, defaults, clean, { position: pos }));
@@ -836,7 +855,9 @@
         btn.addEventListener('click', function(){ setTimeout(saveState, 50); });
       }
       // Re-enable transitions after first paint to avoid flicker
-      function enableTransitions(){ try { document.body.classList.remove('ps-no-anim'); } catch(_){} }
+      function enableTransitions(){
+        try { document.body.classList.remove('ps-no-anim'); } catch(_){ }
+      }
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function(){ setTimeout(enableTransitions, 50); });
       } else { setTimeout(enableTransitions, 50); }
@@ -1037,7 +1058,10 @@
     function close(){
       if (!modal) return;
       try { modal.classList.remove('ps-show'); } catch(_){ }
-      var onEnd = function(){ try { modal.removeEventListener('transitionend', onEnd); } catch(_){ } modal.style.display='none'; };
+      var onEnd = function(){
+        try { modal.removeEventListener('transitionend', onEnd); } catch(_){ }
+        modal.style.display='none';
+      };
       try { modal.addEventListener('transitionend', onEnd); } catch(_){ setTimeout(onEnd, 650); }
       document.body.style.overflow='';
     }
@@ -1278,7 +1302,10 @@
         fmtD = function(ms){ return new Date(ms).toLocaleDateString('es-CO'); };
       }
       var t = base;
-      function tick(){ try { elT.textContent = fmtT(t); elD.textContent = fmtD(t); } catch(_){} t += 1000; }
+      function tick(){
+        try { elT.textContent = fmtT(t); elD.textContent = fmtD(t); } catch(_){}
+        t += 1000;
+      }
       tick();
       setInterval(tick, 1000);
     } catch(_){ }
@@ -1434,7 +1461,10 @@
       function closeModal(){
         if (!modal) return;
         try { modal.classList.remove('ps-show'); } catch(_){ }
-        var onEnd = function(){ try { modal.removeEventListener('transitionend', onEnd); } catch(_){ } modal.style.display = 'none'; };
+        var onEnd = function(){
+          try { modal.removeEventListener('transitionend', onEnd); } catch(_){ }
+          modal.style.display='none';
+        };
         try { modal.addEventListener('transitionend', onEnd); } catch(_){ setTimeout(onEnd, 650); }
       }
       function setBadge(n){ try { if (!badge) return; if (n > 0) { badge.style.display = ''; badge.textContent = n; } else { badge.style.display = 'none'; } } catch(_){} }
@@ -1514,13 +1544,13 @@
       }
       function section(variant, icon, title, count, itemsHtml){
         return (
-          '<div class="notify-section ' + variant + '">' +
-            '<div class="ns-header">' +
-              '<div class="title"><i class="' + icon + '"></i>' + title + '</div>' +
-              '<div class="count">' + count + '</div>' +
-            '</div>' +
-            '<div class="ns-list">' + (itemsHtml || '<div class="p-3 text-muted">Sin registros</div>') + '</div>' +
-          '</div>'
+          '<div class="notify-section ' + variant + '">'
+            + '<div class="ns-header">'
+              + '<div class="title"><i class="' + icon + '"></i>' + title + '</div>'
+              + '<div class="count">' + count + '</div>'
+            + '</div>'
+            + '<div class="ns-list">' + (itemsHtml || '<div class="p-3 text-muted">Sin registros</div>') + '</div>'
+          + '</div>'
         );
       }
       function renderAlerts(data){
@@ -1625,7 +1655,9 @@
         } catch(e) { renderError('Error al procesar datos'); }
       }
       function renderError(msg){ if (bodyEl) bodyEl.innerHTML = '<div class="p-3 text-danger">' + (msg||'Error desconocido') + '</div>'; try { setBadge(0); } catch(_){} }
-      function debouncedFetch(){ try { if (__psNotifyDebounce) clearTimeout(__psNotifyDebounce); __psNotifyDebounce = setTimeout(fetchAlerts, 500); } catch(_){} }
+      function debouncedFetch(){
+        try { if (__psNotifyDebounce) clearTimeout(__psNotifyDebounce); __psNotifyDebounce = setTimeout(fetchAlerts, 500); } catch(_){}
+      }
       function init(){
         if (fab) fab.addEventListener('click', function(){ openModal(); fetchAlerts(); });
         if (refreshBtn) refreshBtn.addEventListener('click', function(){ fetchAlerts(); });
@@ -1666,7 +1698,8 @@
         // Close on ESC
         document.addEventListener('keydown', function(e){ if ((e.key === 'Escape' || e.key === 'Esc') && modal && modal.style.display === 'block') { closeModal(); } });
       }
-      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+      else init();
     })();
   </script>
   
