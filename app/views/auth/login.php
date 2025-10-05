@@ -317,21 +317,21 @@
   }
 
   /* Toast notifications (centered like light modal) */
-  .login-toast-wrap { position: fixed; inset: 0; z-index: 1060; display: flex; align-items: center; justify-content: center; padding: 16px; background: transparent; }
-  .login-toast { width: min(92vw, 520px); background: #ffffff; color: #111827; border-radius: 16px; box-shadow: 0 30px 80px rgba(0,0,0,.25); overflow: hidden; border: 1px solid #e5e7eb; animation: toastIn .22s ease-out; pointer-events: auto; }
-  .login-toast .bar { height: 4px; background: linear-gradient(90deg, #22d3ee, #a78bfa, #22c55e); }
-  .login-toast .content { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 16px; }
-  .login-toast .pill { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: #0ea5e9; color: #fff; box-shadow: inset 0 -2px 0 rgba(0,0,0,.25); }
-  .login-toast .title { font-weight: 900; margin-bottom: 2px; color: #0f172a; }
-  .login-toast .msg { color: #991b1b; font-weight: 800; background: #fee2e2; border: 1px solid #fecaca; border-radius: 10px; padding: 8px 10px; }
-  .login-toast .tips { margin: 6px 0 0; padding-left: 18px; color: #374151; font-size: .95rem; text-align: left; }
-  .login-toast .actions { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 8px; }
-  .login-toast .btn { border-radius: 10px; font-weight: 800; padding: 6px 10px; font-size: .9rem; }
-  .login-toast .btn-success { background: #22c55e; border: 1px solid #16a34a; color: #052e16; }
+  .login-toast-wrap { position: fixed; inset: 0; z-index: 1060; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,0.1); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  .login-toast { width: min(94vw, 560px); background: #ffffff; color: #111827; border-radius: 20px; box-shadow: 0 30px 90px -10px rgba(0,0,0,.3); overflow: hidden; border: 1px solid rgba(0,0,0,0.05); animation: toastIn .45s cubic-bezier(.21,1.02,.73,1) forwards; pointer-events: auto; }
+  .login-toast .bar { height: 5px; background: linear-gradient(90deg, #ef4444, #f87171, #fca5a5); }
+  .login-toast .content { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 16px; padding: 24px; }
+  .login-toast .pill { width: 60px; height: 60px; border-radius: 16px; display: grid; place-items: center; background: #ef4444; color: #fff; font-size: 24px; box-shadow: inset 0 -3px 0 rgba(0,0,0,.25); }
+  .login-toast .title { font-weight: 900; font-size: 22px; margin-bottom: 4px; color: #0f172a; }
+  .login-toast .msg { color: #991b1b; font-weight: 700; background: #fee2e2; border: 1px solid #fecaca; border-radius: 12px; padding: 12px 16px; font-size: 16px; }
+  .login-toast .tips { margin: 12px 0 0; padding-left: 18px; color: #374151; font-size: 1rem; text-align: left; }
+  .login-toast .actions { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 16px; }
+  .login-toast .btn { border-radius: 12px; font-weight: 800; padding: 10px 16px; font-size: 1rem; }
+  .login-toast .btn-success { background: #22c55e; border: 1px solid #16a34a; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.2); }
   .login-toast .btn-outline-success { background: transparent; border: 1px solid #16a34a; color: #065f46; }
   .login-toast .close { background: transparent; border: none; color: #6b7280; font-size: 18px; line-height: 1; padding: 4px 6px; }
-  @keyframes toastIn { from { transform: translateY(6px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-  @keyframes toastOut { to { transform: translateY(-6px); opacity: 0; } }
+  @keyframes toastIn { from { transform: translateY(-20px) scale(0.95); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+  @keyframes toastOut { to { transform: translateY(20px) scale(0.95); opacity: 0; } }
   .form-control.invalid { border-color: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,.12); }
 
   /* keep placeholder to avoid duplicate definitions above */
@@ -500,6 +500,10 @@
             }, 160);
           } catch(_){}
         }
+
+        // Automatically close the toast after 10 seconds
+        setTimeout(closeToast, 10000);
+
         if (closeBtn) closeBtn.addEventListener('click', closeToast);
         if (fixBtn) fixBtn.addEventListener('click', function(){
           closeToast();

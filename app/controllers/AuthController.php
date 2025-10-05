@@ -84,16 +84,6 @@ class AuthController extends Controller {
                     $userAgent,
                     'failed'
                 );
-            } else {
-                // Log failed login with unknown user
-                $loginLog->logLogin(
-                    null,
-                    'Unknown User',
-                    'guest',
-                    $ipAddress,
-                    $userAgent,
-                    'failed'
-                );
             }
             
             // Determine specific error
