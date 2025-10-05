@@ -170,6 +170,22 @@
     .chip-emph.chip-warn { background:#fffbeb; color:#92400e; border-color:#f59e0b; }
     .chip-emph.chip-danger { background:#fff1f2; color:#7f1d1d; border-color:#ef4444; }
     .text-amber-strong { color: #f59e0b !important; }
+    
+    /* Ensure status badges have proper spacing and alignment */
+    .ps-status-badge {
+      display: inline-flex !important;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px !important;
+      font-size: 10px !important;
+      line-height: 1.2;
+      font-weight: 600;
+      border-radius: 4px !important;
+      margin-left: 4px;
+    }
+    .ps-status-badge i {
+      font-size: 9px;
+    }
 
     /* Subtle floating + glow animations for FABs */
     @keyframes ps-fab-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
@@ -461,6 +477,9 @@
         <i class="fas fa-shopping-cart mr-2 text-primary" aria-hidden="true"></i>
         Carrito
         <span class="badge badge-secondary ml-2" id="globalCartModalCount">0</span>
+        <span id="cartStatusIndicator" class="badge badge-success ml-2" style="display: none;">
+          <i class="fas fa-check-circle"></i> OK
+        </span>
       </h5>
       <button type="button" class="close" id="globalCartModalClose" aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
     </div>
@@ -890,6 +909,45 @@
     function render(){
       var items = read();
       var cnt = items.length;
+      
+      // Update status indicator
+      var statusIndicator = document.getElementById('cartStatusIndicator');
+      var isCheckout = window.location.pathname.indexOf('/sales/create') >= 0;
+      
+      // Force refresh of status indicators when cart is rendered
+      items.forEach(function(item) {
+        // Ensure isInStock is properly set based on stock if not already present
+        if (item.isInStock === undefined) {
+          item.isInStock = (parseInt(item.stock || 0) > 0);
+        }
+      });
+      if (statusIndicator) {
+        if (cnt === 0) {
+          statusIndicator.style.display = 'none';
+        } else {
+          // Check if we're on the checkout page
+          if (isOnCreateSale()) {
+            statusIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando venta';
+            statusIndicator.className = 'badge badge-info ml-2';
+          } else {
+            // Check if any item is out of stock
+            var hasOutOfStock = items.some(function(item) {
+              return item.stock !== undefined && item.stock <= 0;
+            });
+            
+            if (hasOutOfStock) {
+              statusIndicator.innerHTML = '<i class="fas fa-clock"></i> En espera';
+              statusIndicator.className = 'badge badge-warning ml-2';
+            } else {
+              statusIndicator.innerHTML = '<i class="fas fa-check-circle"></i> OK';
+              statusIndicator.className = 'badge badge-success ml-2';
+            }
+          }
+          statusIndicator.style.display = 'inline-flex';
+          statusIndicator.style.alignItems = 'center';
+          statusIndicator.style.gap = '4px';
+        }
+      }
       if (fabCount){ fabCount.style.display = cnt>0?'inline-block':'none'; fabCount.textContent = String(cnt); }
       if (mCount){ mCount.textContent = String(cnt); }
       // Toggle footer CTAs depending on location
@@ -919,11 +977,34 @@
         var sku = (it.sku||'').replace(/</g,'&lt;');
         var q = Math.max(1, parseInt(it.qty||1,10)||1);
         var p = Math.max(0, Math.round(parseFloat(it.unit_price||0)||0));
+        var stock = parseInt(it.stock||0, 10) || 0;
+        var isInStock = stock > 0;
+        var isCheckout = window.location.pathname.indexOf('/sales/create') >= 0;
         var imp = q*p;
+        
+        // Determine status text and style
+        var statusText, statusClass, statusIcon;
+        if (isCheckout) {
+          statusText = 'Procesando';
+          statusClass = 'badge-info';
+          statusIcon = 'fa-spinner fa-spin';
+        } else if (isInStock) {
+          statusText = 'OK';
+          statusClass = 'badge-success';
+          statusIcon = 'fa-check';
+        } else {
+          statusText = 'En espera';
+          statusClass = 'badge-warning';
+          statusIcon = 'fa-clock';
+        }
+        
+        // Ensure the status class is properly applied
+        statusClass = 'badge ' + statusClass + ' ps-status-badge';
+        
         html += '<tr data-i="'+i+'">'
           + '<td>'+idx+'</td>'
           + '<td>'+sku+'</td>'
-          + '<td>' + (img?('<img src="'+img+'" alt="" style="width:42px;height:42px;object-fit:cover;border-radius:4px;border:1px solid #eee;margin-right:8px;vertical-align:middle;">'):'') + name + '</td>'
+          + '<td>' + (img?('<img src="'+img+'" alt="" style="width:42px;height:42px;object-fit:cover;border-radius:4px;border:1px solid #eee;margin-right:8px;vertical-align:middle;">'):'') + name + ' <span class="'+statusClass+'" style="display:inline-flex; align-items:center; gap:3px; font-size:10px; padding: 2px 8px; border-radius:4px; vertical-align: middle; white-space: nowrap;"><i class="fas '+statusIcon+'"></i> '+statusText+'</span></td>'
           + '<td class="text-right">'+q+'</td>'
           + '<td class="text-right">'+fmt(p)+'</td>'
           + '<td class="text-right">'+fmt(imp)+'</td>'

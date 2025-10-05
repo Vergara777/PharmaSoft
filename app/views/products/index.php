@@ -1080,7 +1080,19 @@
         if (stock <= 0) {
           return centerNotify({ icon:'warning', title:'Sin stock', text:'No hay stock disponible.' , position:'bottom-end', toast:true });
         }
-        var item = { product_id: pid, sku: sku, name: name, description: desc, unit_price: price, stock: stock, image: img, status: status, qty: 1 };
+        var isInStock = stock > 0;
+        var item = { 
+          product_id: pid, 
+          sku: sku, 
+          name: name, 
+          description: desc, 
+          unit_price: price, 
+          stock: stock, 
+          image: img, 
+          status: status, 
+          qty: 1,
+          isInStock: isInStock  // Explicitly track stock status
+        };
         var proceed = function(){
           // Show centered blocking overlay for ~3.5s while adding
           try { window.bannerLoadingMinDuration = 3500; } catch(_){ }
@@ -1106,7 +1118,14 @@
               if ((arr[i]||{}).product_id === pid) {
                 var next = Math.min(stock, (parseInt(arr[i].qty||'1',10)||1)+1);
                 arr[i].qty = next;
-                arr[i].unit_price = price; arr[i].name = name; arr[i].sku = sku; arr[i].image = img; arr[i].status = status; arr[i].description = desc; arr[i].stock = stock;
+                arr[i].unit_price = price; 
+                arr[i].name = name; 
+                arr[i].sku = sku; 
+                arr[i].image = img; 
+                arr[i].status = status; 
+                arr[i].description = desc; 
+                arr[i].stock = stock;
+                arr[i].isInStock = stock > 0;  // Update stock status
                 found = true; break;
               }
             }

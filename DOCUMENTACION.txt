@@ -1,0 +1,182 @@
+=============================================
+           PHARMASOFT 2.0 - DOCUMENTACIÓN
+=============================================
+
+ÍNDICE
+------
+1.  Descripción General
+2.  Requisitos del Sistema
+3.  Estructura del Proyecto
+4.  Configuración Inicial
+5.  Características Principales
+6.  Módulos del Sistema
+7.  Dependencias y Librerías
+8.  Estructura de Base de Datos
+9.  API y Servicios
+10. Seguridad
+11. Despliegue
+12. Mantenimiento
+13. Preguntas Frecuentes
+
+1. DESCRIPCIÓN GENERAL
+-------------------
+PharmaSoft 2.0 es un sistema integral de gestión farmacéutica diseñado para administrar el inventario, ventas, compras, proveedores y reportes de una farmacia. El sistema está construido bajo la arquitectura MVC (Modelo-Vista-Controlador) en PHP y utiliza MySQL como motor de base de datos.
+
+2. REQUISITOS DEL SISTEMA
+----------------------
+- Servidor Web: Apache 2.4+
+- PHP: 7.4 o superior
+- MySQL: 5.7 o superior / MariaDB 10.3+
+- Extensiones PHP requeridas:
+  - PDO
+  - MySQLi
+  - GD
+  - OpenSSL
+  - JSON
+  - MBString
+  - XML
+  - ZipArchive
+
+3. ESTRUCTURA DEL PROYECTO
+------------------------
+/PharmaSoft2.0/
+│
+├── app/                    # Código fuente de la aplicación
+│   ├── config/            # Archivos de configuración
+│   ├── controllers/       # Controladores MVC
+│   ├── core/              # Núcleo del framework
+│   ├── helpers/           # Funciones de ayuda
+│   ├── models/            # Modelos de base de datos
+│   └── views/             # Vistas del sistema
+│
+├── database/              # Scripts SQL y migraciones
+├── public/                # Archivos públicos
+│   ├── css/              # Hojas de estilo
+│   ├── js/               # Scripts JavaScript
+│   └── uploads/          # Archivos subidos
+└── vendor/               # Dependencias de Composer
+
+4. CONFIGURACIÓN INICIAL
+----------------------
+1. Clonar el repositorio en el directorio web
+2. Configurar el archivo `app/config/config.php` con los datos de conexión
+3. Importar la base de datos desde `database/`
+4. Configurar permisos de escritura en `public/uploads/`
+5. Configurar el Virtual Host de Apache
+6. Acceder a `http://localhost/PharmaSoft2.0/`
+
+5. CARACTERÍSTICAS PRINCIPALES
+---------------------------
+- Gestión de inventario completo
+- Control de ventas y facturación
+- Administración de proveedores
+- Reportes y estadísticas
+- Múltiples perfiles de usuario
+- Interfaz responsiva
+- Exportación a Excel
+- Búsqueda avanzada
+- Notificaciones en tiempo real
+
+6. MÓDULOS DEL SISTEMA
+--------------------
+- Autenticación y Autorización
+- Dashboard
+- Productos
+- Categorías
+- Inventario
+- Ventas
+- Clientes
+- Proveedores
+- Compras
+- Reportes
+- Usuarios
+- Configuración
+
+7. DEPENDENCIAS Y LIBRERÍAS
+-------------------------
+- Frontend:
+  - Bootstrap 4.6
+  - jQuery 3.6
+  - AdminLTE 3.2
+  - Font Awesome 5
+  - DataTables
+  - SweetAlert2
+  - Chart.js
+
+- Backend:
+  - PHPSpreadsheet (para Excel)
+  - PHP Mailer
+  - JWT (JSON Web Tokens)
+
+8. ESTRUCTURA DE BASE DE DATOS
+---------------------------
+Principales tablas:
+- usuarios
+- perfiles
+- productos
+- categorias
+- inventario
+- ventas
+- venta_detalles
+- clientes
+- proveedores
+- compras
+- compra_detalles
+- logs_acceso
+
+9. API Y SERVICIOS
+----------------
+El sistema expone endpoints REST para:
+- Autenticación
+- Consulta de productos
+- Procesamiento de ventas
+- Reportes
+- Sincronización con otros sistemas
+
+10. SEGURIDAD
+-----------
+- Autenticación con hash bcrypt
+- Protección CSRF
+- Validación de entrada
+- Sanitización de salida
+- Control de acceso basado en roles
+- Registro de actividades
+- Límite de intentos de inicio de sesión
+
+11. DESPLIEGUE
+------------
+1. Configurar el entorno de producción
+2. Actualizar las variables de entorno
+3. Configurar el cron para tareas programadas
+4. Configurar copias de seguridad automáticas
+5. Configurar SSL/TLS
+
+12. MANTENIMIENTO
+--------------
+- Realizar copias de seguridad periódicas
+- Mantener actualizadas las dependencias
+- Monitorear los logs de errores
+- Optimizar la base de datos regularmente
+- Revisar la seguridad periódicamente
+
+13. PREGUNTAS FRECUENTES
+----------------------
+Q: ¿Cómo restablecer la contraseña de administrador?
+R: Ejecutar el script SQL de restablecimiento en `database/reset_admin_password.sql`
+
+Q: ¿Cómo habilitar el modo mantenimiento?
+R: Crear un archivo `maintenance.lock` en el directorio raíz
+
+Q: ¿Dónde configurar el correo electrónico?
+R: En `app/config/mail.php`
+
+Q: ¿Cómo actualizar el sistema?
+R: 
+1. Hacer backup de la base de datos
+2. Descargar la nueva versión
+3. Reemplazar archivos (excepto configuraciones)
+4. Ejecutar migraciones si es necesario
+
+---
+Documentación actualizada: Octubre 2024
+Soporte: soporte@pharmasoft.com
