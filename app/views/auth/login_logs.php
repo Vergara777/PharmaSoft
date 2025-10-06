@@ -26,13 +26,14 @@
                             <th>Estado de Acceso</th>
                             <th>Dirección IP</th>
                             <th>Inicio de Sesión</th>
+                            <th>Cierre de Sesión</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if (empty($logs)): ?>
                             <tr>
-                                <td colspan="7" class="text-center">No hay registros de acceso</td>
+                                <td colspan="8" class="text-center">No hay registros de acceso</td>
                             </tr>
                         <?php else: ?>
                             <?php 
@@ -67,15 +68,26 @@
                                         </span>
                                     </td>
                                     <td>
-                                        <small class="text-muted">
-                                            <?= htmlspecialchars(mb_strimwidth($log['user_agent'] ?? '', 0, 50, '...')) ?>
-                                        </small>
-                                    </td>
-                                    <td>
                                         <div class="text-nowrap">
                                             <div><?= date('d/m/Y', strtotime($log['login_time'])) ?></div>
                                             <div class="text-muted small"><?= date('h:i a', strtotime($log['login_time'])) ?></div>
                                         </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <?php if (!empty($log['logout_time'])): ?>
+                                            <div class="d-flex flex-column align-items-center">
+                                                <div class="text-nowrap">
+                                                    <div><?= date('d/m/Y', strtotime($log['logout_time'])) ?></div>
+                                                    <div class="text-muted small"><?= date('h:i a', strtotime($log['logout_time'])) ?></div>
+                                                </div>
+                                                <span class="badge badge-secondary mt-1">Inactivo</span>
+                                            </div>
+                                        <?php else: ?>
+                                            <div class="d-flex flex-column align-items-center">
+                                                <div class="text-muted small">- - -</div>
+                                                <span class="badge badge-success mt-1">Sesión activa</span>
+                                            </div>
+                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <button class="btn btn-sm btn-info view-details" 
@@ -86,7 +98,8 @@
                                                 data-status="<?= $log['status'] === 'success' ? 'Éxito' : 'Fallido' ?>"
                                                 data-ip="<?= htmlspecialchars($log['ip_address']) ?>"
                                                 data-useragent="<?= htmlspecialchars($log['user_agent']) ?>"
-                                                data-logintime="<?= date('d/m/Y h:i a', strtotime($log['login_time'])) ?>">
+                                                data-logintime="<?= date('d/m/Y h:i a', strtotime($log['login_time'])) ?>"
+                                                data-logouttime="<?= !empty($log['logout_time']) ? date('d/m/Y h:i a', strtotime($log['logout_time'])) : 'Sesión activa' ?>">
                                             <i class="fas fa-eye"></i> Ver
                                         </button>
                                     </td>
@@ -145,7 +158,6 @@
             <div class="modal-body">
                 <div class="container-fluid">
                     <div class="row mb-3">
-                        <div class="col-md-6">
                             <h6 class="font-weight-bold">Información del Usuario</h6>
                             <table class="table table-sm table-bordered">
                                 <tr>
@@ -157,79 +169,89 @@
                                     <td id="detail-role"></td>
                                 </tr>
                                 <tr>
-                                    <th class="bg-light">Estado:</th>
+                                    <th class="bg-light">Estado de Acceso:</th>
                                     <td id="detail-status"></td>
                                 </tr>
-                            </table>
-                        </div>
-                        <div class="col-md-6">
-                            <h6 class="font-weight-bold">Detalles de Conexión</h6>
-                            <table class="table table-sm table-bordered">
                                 <tr>
-                                    <th class="bg-light" style="width: 40%">Dirección IP:</th>
+                                    <th class="bg-light">Dirección IP:</th>
                                     <td id="detail-ip"></td>
                                 </tr>
                                 <tr>
-                                    <th class="bg-light">Fecha y Hora:</th>
-                                    <td id="detail-logintime"></td>
+                                    <th class="bg-light">Navegador/Dispositivo:</th>
+                                    <td id="detail-useragent"></td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">Hora de Inicio:</th>
+                                    <td id="detail-login-time"></td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">Hora de Cierre:</th>
+                                    <td id="detail-logout-time"></td>
                                 </tr>
                             </table>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-12">
-                            <h6 class="font-weight-bold">Información del Navegador/Dispositivo</h6>
-                            <div class="bg-light p-3 rounded">
-                                <code id="detail-useragent" class="small"></code>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
-            </div>
-        </div>
-    </div>
-</div>
+{{ ... }}
+<!-- jQuery (required for Bootstrap) -->
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<!-- Bootstrap 5 JS Bundle with Popper -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Refresh button functionality
-    document.getElementById('refreshBtn').addEventListener('click', function() {
+// Esperar a que jQuery esté disponible
+if (typeof jQuery !== 'undefined') {
+    jQuery(document).ready(function($) {
+    // Botón de actualizar
+    $('#refreshBtn').on('click', function(e) {
+        e.preventDefault();
         window.location.reload();
     });
 
-    // Initialize login details modal
-    $('#loginDetailsModal').on('show.bs.modal', function (event) {
-        var button = $(event.relatedTarget);
-        var modal = $(this);
+    // Inicializar el modal de detalles
+    $(document).on('click', '.view-details', function(e) {
+        e.preventDefault();
         
-        // Set modal content from data attributes
-        modal.find('#detail-name').text(button.data('name'));
-        modal.find('#detail-role').text(button.data('role'));
+        var button = $(this);
+        var modal = $('#loginDetailsModal');
+        
+        // Actualizar el contenido del modal con los datos del botón
+        modal.find('#detail-name').text(button.data('name') || 'No disponible');
+        modal.find('#detail-role').text(button.data('role') || 'No disponible');
+        
+        // Actualizar estado con el estilo correcto
+        var status = button.data('status') || 'Fallido';
+        var statusClass = status === 'Éxito' ? 'success' : 'danger';
         modal.find('#detail-status').html(
-            '<span class="badge badge-' + (button.data('status') === 'Éxito' ? 'success' : 'danger') + '">' + 
-            button.data('status') + '</span>'
+            '<span class="badge badge-' + statusClass + '">' + status + '</span>'
         );
-        modal.find('#detail-ip').text(button.data('ip'));
-        modal.find('#detail-logintime').text(button.data('logintime'));
-        modal.find('#detail-useragent').text(button.data('useragent'));
+        
+        // Actualizar el resto de la información
+        modal.find('#detail-ip').text(button.data('ip') || 'No disponible');
+        modal.find('#detail-useragent').text(button.data('useragent') || 'No disponible');
+        modal.find('#detail-login-time').text(button.data('logintime') || 'No disponible');
+        
+        // Actualizar el estado de cierre de sesión para que coincida con la columna
+        var logoutTime = button.data('logouttime');
+        if (logoutTime && logoutTime !== 'Sesión activa') {
+            modal.find('#detail-logout-time').html(
+                '<div class="text-nowrap">' +
+                '   <div>' + logoutTime.split(' ')[0] + '</div>' +
+                '   <div class="text-muted small">' + logoutTime.split(' ').slice(1).join(' ') + '</div>' +
+                '</div>' +
+                '<span class="badge bg-secondary mt-1">Inactivo</span>'
+            );
+        } else {
+            modal.find('#detail-logout-time').html(
+                '<div class="text-muted small">- - -</div>' +
+                '<span class="badge bg-success mt-1">Sesión activa</span>'
+            );
+        }
+        
+        // Mostrar el modal (nueva sintaxis de Bootstrap 5)
+        var modalInstance = new bootstrap.Modal(modal[0]);
+        modalInstance.show();
     });
-
-    // Add dataTable functionality if available
-    if (typeof $.fn.DataTable === 'function') {
-        // Disable DataTable's built-in ordering since we're handling it in PHP
-        $('#loginLogsTable').DataTable({
-            "ordering": false,
-            "language": {
-                "url": "//cdn.datatables.net/plug-ins/1.10.25/i18n/Spanish.json"
-            },
-            "responsive": true,
-            "pageLength": 25,
-            "dom": '<"top"f>rt<"bottom"lip><"clear">'
-        });
-    }
 });
+} else {
+    console.error('jQuery no se ha cargado correctamente');
+}
 </script>
 

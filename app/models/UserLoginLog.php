@@ -8,12 +8,12 @@ class UserLoginLog extends Model {
     /**
      * Log a user login attempt
      */
-    public function logLogin(int $userId, string $name, string $role, string $ip, string $userAgent, string $status): bool {
+    public function logLogin(int $userId, string $name, string $role, string $ip, string $userAgent, string $status): int {
         $sql = "INSERT INTO user_login_logs (user_id, name, role, ip_address, user_agent, login_time, status) 
                 VALUES (:user_id, :name, :role, :ip_address, :user_agent, :login_time, :status)";
                 
         $stmt = $this->db->prepare($sql);
-        return $stmt->execute([
+        $stmt->execute([
             ':user_id' => $userId,
             ':name' => $name,
             ':role' => $role,
@@ -22,6 +22,60 @@ class UserLoginLog extends Model {
             ':login_time' => date('Y-m-d H:i:s'),
             ':status' => $status
         ]);
+        
+        // Return the ID of the inserted record
+        return (int)$this->db->lastInsertId();
+    }
+    
+    /**
+     * Update logout time for a login record
+     */
+    public function logLogout(int $loginId): bool {
+        error_log("Intentando registrar cierre de sesión para login_id: " . $loginId);
+        
+        try {
+            $sql = "UPDATE user_login_logs 
+                    SET logout_time = :logout_time 
+                    WHERE id = :id AND status = 'success' AND logout_time IS NULL";
+                    
+            $stmt = $this->db->prepare($sql);
+            $result = $stmt->execute([
+                ':id' => $loginId,
+                ':logout_time' => date('Y-m-d H:i:s')
+            ]);
+            
+            if ($result) {
+                $count = $stmt->rowCount();
+                if ($count > 0) {
+                    error_log("Cierre de sesión registrado correctamente para login_id: " . $loginId);
+                } else {
+                    error_log("Advertencia: No se actualizó ningún registro para login_id: " . $loginId . ". ¿Ya existe un logout_time?");
+                }
+                return $count > 0;
+            } else {
+                $error = $stmt->errorInfo();
+                error_log("Error en la consulta SQL al registrar cierre de sesión: " . print_r($error, true));
+                return false;
+            }
+        } catch (\Exception $e) {
+            error_log("Excepción al registrar cierre de sesión: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Get the last successful login ID for a user
+     */
+    public function getLastLoginId(int $userId): ?int {
+        $sql = "SELECT id FROM user_login_logs 
+                WHERE user_id = :user_id AND status = 'success' 
+                ORDER BY login_time DESC LIMIT 1";
+                
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':user_id' => $userId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        return $result ? (int)$result['id'] : null;
     }
 
     /**

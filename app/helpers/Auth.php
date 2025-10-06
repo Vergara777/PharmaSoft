@@ -54,7 +54,54 @@ class Auth {
     }
     
     public static function logout(): void { 
-        unset($_SESSION['user']); 
-        session_regenerate_id(true); 
+        // Log the logout time if user is logged in and has a login ID
+        if (!empty($_SESSION['user']['id'])) {
+            $userId = $_SESSION['user']['id'];
+            $loginId = $_SESSION['login_id'] ?? null;
+            
+            if ($loginId) {
+                error_log("Intentando registrar cierre de sesión para usuario $userId, login_id: $loginId");
+                try {
+                    $loginLog = new \App\Models\UserLoginLog();
+                    $result = $loginLog->logLogout($loginId);
+                    
+                    if ($result) {
+                        error_log("Cierre de sesión registrado correctamente para usuario $userId, login_id: $loginId");
+                    } else {
+                        error_log("No se pudo registrar el cierre de sesión para usuario $userId, login_id: $loginId");
+                        
+                        // Intentar obtener el último login_id si el actual falla
+                        $lastLoginId = $loginLog->getLastLoginId($userId);
+                        if ($lastLoginId && $lastLoginId != $loginId) {
+                            error_log("Intentando con el último login_id conocido: $lastLoginId");
+                            $loginLog->logLogout($lastLoginId);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    error_log('Error al registrar cierre de sesión: ' . $e->getMessage());
+                }
+            } else {
+                error_log("No se encontró login_id en la sesión para el usuario $userId");
+                
+                // Intentar obtener el último login_id si no está en la sesión
+                try {
+                    $loginLog = new \App\Models\UserLoginLog();
+                    $lastLoginId = $loginLog->getLastLoginId($userId);
+                    if ($lastLoginId) {
+                        error_log("Usando último login_id conocido: $lastLoginId");
+                        $loginLog->logLogout($lastLoginId);
+                    }
+                } catch (\Exception $e) {
+                    error_log('Error al obtener último login_id: ' . $e->getMessage());
+                }
+            }
+        } else {
+            error_log("No se pudo obtener el ID de usuario de la sesión");
+        }
+        
+        // Limpiar datos de sesión
+        unset($_SESSION['user']);
+        unset($_SESSION['login_id']);
+        session_regenerate_id(true);
     }
 }

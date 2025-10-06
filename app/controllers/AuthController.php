@@ -39,7 +39,7 @@ class AuthController extends Controller {
         
         if ($user && password_verify($password, $user['password_hash'])) {
             // Log successful login
-            $loginLog->logLogin(
+            $loginId = $loginLog->logLogin(
                 $user['id'],
                 $user['name'],
                 $user['role'],
@@ -50,6 +50,14 @@ class AuthController extends Controller {
             
             unset($user['password_hash']);
             $_SESSION['user'] = $user;
+            
+            // Store the login ID in the session for logout tracking
+            if ($loginId) {
+                $_SESSION['login_id'] = $loginId;
+                error_log("ID de sesión guardado: " . $loginId . " para el usuario: " . $user['id']);
+            } else {
+                error_log("Error: No se pudo obtener el ID de sesión para el usuario: " . $user['id']);
+            }
             
             // Trigger one-time welcome modal on next request
             // 1 = primera vez (en este navegador); 2 = bienvenido de vuelta
